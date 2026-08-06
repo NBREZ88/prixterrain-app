@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PrixTerrain</title>
+<link rel="manifest" href="manifeste.json">
+<meta name="theme-color" content="#1f4d2c">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PrixTerrain">
+<style>
+  :root {
+    --vert: #1f4d2c;
+    --vert-clair: #eaf2ec;
+    --vert-vif: #2f6f3e;
+    --terre: #8a5a00;
+    --terre-clair: #fdf3e5;
+    --rouge: #a33a2a;
+    --encre: #17201a;
+    --gris: #5e6a62;
+    --trait: #dfe4e0;
+    --fond: #f6f8f6;
+    --carte: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--encre);
+    background: var(--fond);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---- Ossature ---- */
+  #entete {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--vert); color: #fff;
+    padding: calc(env(safe-area-inset-top) + .7rem) 1rem .7rem;
+    display: flex; align-items: center; gap: .6rem;
+  }
+  #entete h1 { font-size: 1.15rem; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  #retour {
+    background: none; border: 0; color: #fff; font-size: 1.5rem;
+    line-height: 1; padding: 0 .2rem; cursor: pointer; display: none;
+  }
+  #application {
+    max-width: 40rem; margin: 0 auto;
+    padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  #barre {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: none; background: var(--carte);
+    border-top: 1px solid var(--trait);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #barre .onglet-bas {
+    flex: 1; background: none; border: 0; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: .15rem;
+    padding: .5rem .2rem .45rem; color: var(--gris); font-size: .72rem; font-weight: 500;
+  }
+  #barre .onglet-bas svg { width: 22px; height: 22px; fill: none;
+                           stroke: currentColor; stroke-width: 1.8;
+                           stroke-linecap: round; stroke-linejoin: round; }
+  #barre .onglet-bas.actif { color: var(--vert); }
+  #barre .onglet-bas.actif svg { stroke-width: 2.2; }
+
+  /* ---- Recherche ---- */
+  .recherche { position: relative; margin-bottom: 1rem; }
+  .champ-recherche {
+    width: 100%; font-size: 1.05rem; padding: .85rem 1rem;
+    border: 1px solid var(--trait); border-radius: .75rem; background: var(--carte);
+    -webkit-appearance: none;
+  }
+  .champ-recherche:focus { outline: 2px solid var(--vert-vif); outline-offset: 1px; }
+  .resultats {
+    margin-top: .4rem; background: var(--carte);
+    border: 1px solid var(--trait); border-radius: .75rem; overflow: hidden;
+  }
+  .resultat {
+    display: flex; flex-direction: column; gap: .1rem; width: 100%;
+    text-align: left; background: none; border: 0;
+    border-bottom: 1px solid var(--trait); padding: .7rem 1rem; cursor: pointer;
+  }
+  .resultat:last-child { border-bottom: 0; }
+  .resultat-categorie { font-size: .72rem; text-transform: uppercase;
+                        letter-spacing: .04em; color: var(--gris); }
+  .resultat-nom { font-size: 1.02rem; color: var(--encre); }
+
+  /* ---- Bouton principal ---- */
+  .action-large {
+    width: 100%; font-size: 1.1rem; font-weight: 600; padding: 1rem;
+    background: var(--vert-vif); color: #fff; border: 0;
+    border-radius: .75rem; cursor: pointer; margin-bottom: 1.2rem;
+  }
+  .action-large:active { background: var(--vert); }
+
+  /* ---- Résumé chiffré ---- */
+  .resume { display: flex; gap: .6rem; margin-bottom: 1.4rem; }
+  .bloc-resume {
+    flex: 1; background: var(--carte); border: 1px solid var(--trait);
+    border-radius: .75rem; padding: .7rem .5rem; text-align: center;
+  }
+  .bloc-valeur { display: block; font-size: 1.4rem; font-weight: 700; color: var(--vert); }
+  .bloc-libelle { display: block; font-size: .78rem; color: var(--gris); }
+  .bloc-alerte { border-color: var(--terre); }
+  .bloc-alerte .bloc-valeur { color: var(--terre); }
+
+  /* ---- Cartes ---- */
+  .carte {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--carte); border: 1px solid var(--trait);
+    border-radius: .75rem; padding: .8rem .9rem; margin-bottom: .6rem;
+  }
+  .carte:active { background: var(--vert-clair); }
+  .carte-haut { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
+  .carte-titre { font-size: 1.05rem; font-weight: 600; color: var(--encre); }
+  .carte-prix { font-size: 1.05rem; font-weight: 700; color: var(--vert); white-space: nowrap; }
+  .carte-compte { font-size: 1.1rem; font-weight: 700; color: var(--vert); }
+  .carte-bas { display: flex; justify-content: space-between; gap: .6rem;
+               margin-top: .2rem; font-size: .88rem; color: var(--gris); }
+  .evolution { display: inline-block; margin-top: .45rem; font-size: .82rem; font-weight: 600; }
+  .evolution.hausse { color: var(--rouge); }
+  .evolution.baisse { color: var(--vert-vif); }
+  .evolution.stable, .evolution.neutre { color: var(--gris); font-weight: 500; }
+  .pastille-famille {
+    display: inline-block; margin: .45rem .5rem 0 0; padding: .12rem .5rem;
+    border-radius: 1rem; font-size: .72rem; background: var(--vert-clair); color: var(--vert);
+  }
+  .pastille-famille.PHYTO { background: #eef1f8; color: #2b4a8a; }
+  .pastille-famille.ENGRAIS { background: var(--terre-clair); color: var(--terre); }
+
+  /* ---- Titres et textes ---- */
+  .titre-section { margin: 1.4rem 0 .7rem; font-size: .8rem; font-weight: 700;
+                   text-transform: uppercase; letter-spacing: .05em; color: var(--gris); }
+  .appui { font-size: .88rem; color: var(--gris); margin: .15rem 0; }
+  .vide { background: var(--carte); border: 1px dashed var(--trait); border-radius: .75rem;
+          padding: 1.2rem; text-align: center; color: var(--gris); }
+  .aucune { margin: 0; padding: .8rem 1rem; color: var(--gris); }
+
+  /* ---- Formulaires ---- */
+  .champ { margin-bottom: 1.1rem; }
+  .etiquette { display: block; font-size: .88rem; font-weight: 600; margin-bottom: .35rem; }
+  .saisie {
+    width: 100%; font-size: 1.05rem; padding: .8rem .9rem;
+    border: 1px solid var(--trait); border-radius: .6rem; background: var(--carte);
+  }
+  .saisie:focus { outline: 2px solid var(--vert-vif); outline-offset: 1px; }
+  .ligne-prix { display: flex; align-items: center; gap: .5rem; }
+  .ligne-prix .saisie { flex: 1; }
+  .choix-unite { width: auto; min-width: 7.5rem; flex: 0 0 auto; }
+  .choix-fait { display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+                border: 1px solid var(--trait); border-radius: .6rem;
+                padding: .8rem .9rem; background: var(--vert-clair); }
+  .choix-nom { font-size: 1.02rem; font-weight: 600; }
+  .propositions { margin-top: .4rem; background: var(--carte);
+                  border: 1px solid var(--trait); border-radius: .6rem; overflow: hidden; }
+  .proposition { display: block; width: 100%; text-align: left; background: none; border: 0;
+                 border-bottom: 1px solid var(--trait); padding: .75rem .9rem;
+                 font-size: 1rem; cursor: pointer; color: var(--encre); }
+  .proposition:last-child { border-bottom: 0; }
+  .creation { color: var(--vert-vif); background: var(--fond); font-weight: 600; }
+  .lien { background: none; border: 0; color: var(--vert-vif); font-size: 1rem;
+          text-decoration: underline; cursor: pointer; padding: .4rem 0; }
+  .details { margin: 0 0 1rem; }
+  .repli { border-left: 3px solid var(--trait); padding-left: .9rem; margin-bottom: 1rem; }
+  .enregistrer { width: 100%; font-size: 1.1rem; font-weight: 600; padding: .95rem;
+                 background: var(--vert-vif); color: #fff; border: 0;
+                 border-radius: .75rem; cursor: pointer; }
+  .enregistrer:active { background: var(--vert); }
+  .bouton-etroit { width: auto; padding: .7rem 1.1rem; font-size: 1rem; }
+  .etiquette-case { font-size: 1rem; }
+
+  /* ---- Messages ---- */
+  .alerte { background: var(--terre-clair); border-left: 4px solid var(--terre);
+            border-radius: .4rem; padding: .75rem .9rem; margin: 0 0 .9rem; }
+  .confirmation { background: var(--vert-clair); border-left: 4px solid var(--vert-vif);
+                  border-radius: .4rem; padding: .75rem .9rem; margin: 0 0 .9rem; }
+  .attente { color: var(--terre); font-size: .9rem; margin: .25rem 0 0; }
+  .manquant { background: var(--terre-clair); border-left: 4px solid #a08a5a;
+              border-radius: .4rem; padding: .7rem .9rem; margin-bottom: .8rem; }
+  .manquant-nom { margin: 0; font-weight: 600; }
+  .manquant-suite { margin: .2rem 0 0; color: var(--gris); font-size: .9rem; }
+
+  /* ---- Blocs de consultation ---- */
+  .groupe { background: var(--carte); border: 1px solid var(--trait);
+            border-radius: .75rem; padding: .8rem .9rem; margin-bottom: .8rem; }
+  .titre-bloc { margin: 0 0 .5rem; font-weight: 600; }
+  .valeur-moyenne { margin: 0 0 .6rem; font-size: 1.05rem; color: var(--vert); font-weight: 600; }
+  .valeur-absente { margin: 0 0 .6rem; color: var(--terre); }
+  .liste-releves { margin: 0; padding-left: 1.1rem; font-size: .95rem; }
+  .liste-releves li { margin-bottom: .3rem; }
+  .liste-releves li.atypique { color: var(--terre); }
+  .marque { font-weight: 600; }
+  .entete-produit { margin-bottom: 1rem; }
+  .entete-produit h2 { margin: 0; font-size: 1.3rem; }
+  .ligne-fiche { display: flex; align-items: center; justify-content: space-between;
+                 gap: .75rem; padding: .35rem 0; }
+  .onglets { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  .onglet { background: var(--carte); border: 1px solid var(--trait); border-radius: 1.2rem;
+            padding: .45rem .9rem; font-size: .95rem; cursor: pointer; color: var(--gris); }
+  .onglet.actif { background: var(--vert); border-color: var(--vert); color: #fff; }
+  .bloc-courbe { margin: 1.2rem 0; }
+  .courbe { width: 100%; height: auto; background: var(--carte);
+            border: 1px solid var(--trait); border-radius: .75rem; }
+  .legende { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .4rem; font-size: .9rem; }
+  .legende-entree { display: flex; align-items: center; gap: .35rem; }
+  .pastille { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
+  .pied-reglages { margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+
+<header id="entete">
+  <button id="retour" type="button" aria-label="Revenir">‹</button>
+  <h1 id="titre">PrixTerrain</h1>
+</header>
+
+<div id="application"><p class="appui">Un instant…</p></div>
+
+<nav id="barre"></nav>
+
+<script>
+// Retient l'invitation d'installation du navigateur pour l'écran Compte.
+window.PrixTerrainInstallation = { invite: null };
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  window.PrixTerrainInstallation.invite = e;
+});
+
+// Garde une copie de l'application sur l'appareil, pour l'ouvrir sans réseau.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js');
+  });
+}
+</script>
+
+<script src="dexie.min.js"></script>
+<script src="supabase.js"></script>
+<script src="configuration.js"></script>
+<script src="base.js"></script>
+<script src="rapprochement.js"></script>
+<script src="consultation.js"></script>
+<script src="tiers.js"></script>
+<script src="accueil.js"></script>
+<script src="saisie.js"></script>
+<script src="reglages.js"></script>
+<script src="export.js"></script>
+<script src="comptes.js"></script>
+
+<script>
+// PrixTerrain — ouverture de session et passage d'un écran à l'autre.
+(function () {
+  'use strict';
+  var A = window.PrixTerrain;
+  var zone = document.getElementById('application');
+  var entete = document.getElementById('entete');
+  var titre = document.getElementById('titre');
+  var retour = document.getElementById('retour');
+  var barre = document.getElementById('barre');
+
+  function echapper(t) {
+    return String(t).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Ouverture de session
+  // ---------------------------------------------------------------------
+  function ecranSession(alerte) {
+    barre.style.display = 'none';
+    retour.style.display = 'none';
+    titre.textContent = 'PrixTerrain';
+    zone.innerHTML =
+      '<p class="appui">Relevé et suivi des prix d\'intrants agricoles.</p>' +
+      (alerte ? '<p class="alerte">' + echapper(alerte) + '</p>' : '') +
+      '<div class="champ"><span class="etiquette">Votre adresse</span>' +
+      '<input class="saisie" type="email" id="adresse" autocomplete="username"></div>' +
+      '<div class="champ"><span class="etiquette">Votre mot de passe</span>' +
+      '<input class="saisie" type="password" id="motdepasse" autocomplete="current-password"></div>' +
+      '<button class="enregistrer" id="entrer">Entrer</button>' +
+      '<p class="manquant-suite">Mot de passe oublié ou perdu : demandez-en un nouveau au ' +
+      'responsable de l\'application. Aucun courriel n\'est envoyé par PrixTerrain.</p>';
+
+    var champAdresse = document.getElementById('adresse');
+    var champMotDePasse = document.getElementById('motdepasse');
+    var boutonEntrer = document.getElementById('entrer');
+
+    champMotDePasse.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') boutonEntrer.click();
+    });
+
+    boutonEntrer.addEventListener('click', function () {
+      var adresse = champAdresse.value.trim();
+      var motDePasse = champMotDePasse.value;
+      if (!adresse || !motDePasse) { ecranSession('Entrez votre adresse et votre mot de passe.'); return; }
+      if (!navigator.onLine) {
+        ecranSession("Pas de réseau pour l'instant. La première ouverture de session en demande.");
+        return;
+      }
+
+      boutonEntrer.disabled = true;
+      boutonEntrer.textContent = 'Un instant…';
+
+      A.base.auth.signInWithPassword({ email: adresse, password: motDePasse })
+        .then(function (r) {
+          if (r.error) throw r.error;
+          return A.base.from('profil').select('*').eq('id', r.data.user.id).limit(1)
+            .then(function (f) {
+              if (f.error) throw f.error;
+              return { utilisateur: r.data.user, fiche: f.data[0] || null };
+            });
+        })
+        .then(function (retour) {
+          if (retour.fiche) return entrer(retour.fiche);
+          return ecranPremiereFois(retour.utilisateur);
+        })
+        .catch(function (erreur) { ecranSession(A.messageSimple(erreur)); });
+    });
+  }
+
+  // Première ouverture d'un compte : la fiche de conseiller se crée ici.
+  function ecranPremiereFois(utilisateur) {
+    titre.textContent = 'Bienvenue';
+    zone.innerHTML =
+      '<p>Votre nom apparaîtra à côté des relevés que vous saisirez, ' +
+      'pour que l\'équipe sache qui a relevé quel prix.</p>' +
+      '<div class="champ"><span class="etiquette">Votre nom et prénom</span>' +
+      '<input class="saisie" type="text" id="nom" placeholder="Marie Dupont"></div>' +
+      '<p class="alerte" id="alerte-nom" style="display:none"></p>' +
+      '<button class="enregistrer" id="valider">Continuer</button>';
+
+    var alerte = document.getElementById('alerte-nom');
+    document.getElementById('valider').addEventListener('click', function () {
+      var nom = document.getElementById('nom').value.trim();
+      if (nom.length < 3) {
+        alerte.textContent = 'Entrez votre nom et votre prénom.';
+        alerte.style.display = 'block';
+        return;
+      }
+      var bouton = this;
+      bouton.disabled = true;
+      bouton.textContent = 'Un instant…';
+
+      A.base.from('profil')
+        .insert({ id: utilisateur.id, nom: nom, courriel: utilisateur.email })
+        .select()
+        .then(function (r) {
+          if (r.error) throw r.error;
+          return entrer(r.data[0]);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          bouton.textContent = 'Continuer';
+          alerte.textContent = A.messageSimple(erreur);
+          alerte.style.display = 'block';
+        });
+    });
+  }
+
+  function entrer(fiche) {
+    return A.memoriserCompte(fiche).then(function () {
+      A.demarrerSynchronisation();
+      demarrerApplication(fiche);
+      return A.synchroniser().then(function () { return rafraichirCompte(fiche); });
+    });
+  }
+
+  function rafraichirCompte(fiche) {
+    return A.bd.profil.get(fiche.id).then(function (aJour) {
+      if (!aJour) return;
+      if (aJour.role === fiche.role && aJour.nom === fiche.nom && aJour.actif === fiche.actif) return;
+      return A.memoriserCompte(aJour).then(function () { demarrerApplication(aJour); });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------
+  var ECRANS = {
+    accueil:      { titre: 'PrixTerrain',   afficher: function (z, c) { return A.afficherAccueil(z, c); } },
+    fournisseurs: { titre: 'Fournisseurs',  afficher: function (z, c) { return A.afficherListeFournisseurs(z, c); } },
+    outils:       { titre: 'Outils',        afficher: function (z, c) { return ecranOutils(z, c); } },
+    compte:       { titre: 'Mon compte',    afficher: function (z, c) { return A.afficherComptes(z, c); } },
+    saisie:       { titre: 'Saisir un prix', afficher: function (z, c) { return A.afficherSaisie(z, c); } },
+    produit:      { titre: 'Fiche produit', afficher: function (z, c, p) { return A.afficherFicheProduit(z, c, p); } },
+    fournisseur:  { titre: 'Fiche fournisseur', afficher: function (z, c, p) { return A.afficherFicheFournisseur(z, c, p); } },
+    export:       { titre: 'Export tableur', afficher: function (z, c) { return A.afficherExport(z, c); } },
+    doublons:     { titre: 'Fiches en double', afficher: function (z, c) { return A.afficherRapprochement(z, c); } },
+    reglages:     { titre: 'Réglages',      afficher: function (z, c) { return A.afficherReglages(z, c); } }
+  };
+
+  var ICONES = {
+    accueil: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/>',
+    fournisseurs: '<path d="M3 9h18l-1.5 12h-15z"/><path d="M8.5 9V6a3.5 3.5 0 0 1 7 0v3"/>',
+    outils: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/>',
+    compte: '<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>'
+  };
+
+  var ONGLETS = ['accueil', 'fournisseurs', 'outils', 'compte'];
+  var LIBELLES_ONGLETS = { accueil: 'Accueil', fournisseurs: 'Fournisseurs',
+                           outils: 'Outils', compte: 'Compte' };
+
+  var compteCourant = null;
+  var ongletCourant = 'accueil';
+  var pile = [];
+
+  function naviguer(nom, parametres) {
+    if (ONGLETS.indexOf(nom) >= 0) { ongletCourant = nom; pile = []; }
+    else pile.push({ nom: nom, parametres: parametres || {} });
+    dessiner();
+  }
+
+  function revenir() {
+    pile.pop();
+    dessiner();
+  }
+
+  function dessiner() {
+    var courant = pile.length ? pile[pile.length - 1] : { nom: ongletCourant, parametres: {} };
+    var ecran = ECRANS[courant.nom];
+
+    titre.textContent = courant.parametres.fiche ? courant.parametres.fiche.nom : ecran.titre;
+    retour.style.display = pile.length ? 'block' : 'none';
+    barre.style.display = 'flex';
+
+    barre.innerHTML = '';
+    ONGLETS.forEach(function (nom) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'onglet-bas' + (!pile.length && nom === ongletCourant ? ' actif' : '');
+      b.innerHTML = '<svg viewBox="0 0 24 24">' + ICONES[nom] + '</svg><span>' +
+                    LIBELLES_ONGLETS[nom] + '</span>';
+      b.addEventListener('click', function () { naviguer(nom); });
+      barre.appendChild(b);
+    });
+
+    zone.innerHTML = '';
+    entete.scrollIntoView({ block: 'start' });
+    ecran.afficher(zone, compteCourant, courant.parametres);
+  }
+
+  retour.addEventListener('click', revenir);
+
+  // Écran Outils : porte d'entrée vers les pages qui ne méritent pas un onglet.
+  function ecranOutils(z, compte) {
+    var entrees = [
+      { nom: 'export',   libelle: 'Export tableur',
+        aide: 'Les relevés et les prix moyens dans un fichier pour votre tableur.' },
+      { nom: 'doublons', libelle: 'Fiches en double',
+        aide: 'Rapprocher deux fiches produit ou fournisseur qui désignent la même chose.' }
+    ];
+    if (compte.role === 'administrateur') {
+      entrees.push({ nom: 'reglages', libelle: 'Réglages',
+        aide: 'Les durées, seuils et coefficients qui commandent le calcul des prix moyens.' });
+    }
+    entrees.forEach(function (e) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'carte';
+      b.innerHTML = '<div class="carte-haut"><span class="carte-titre">' + e.libelle +
+                    '</span><span class="carte-date">›</span></div>' +
+                    '<div class="carte-bas"><span>' + e.aide + '</span></div>';
+      b.addEventListener('click', function () { naviguer(e.nom); });
+      z.appendChild(b);
+    });
+  }
+
+  function demarrerApplication(compte) {
+    compteCourant = compte;
+    ongletCourant = 'accueil';
+    pile = [];
+    dessiner();
+  }
+
+  A.naviguer = naviguer;
+  A.revenir = revenir;
+
+  // ---------------------------------------------------------------------
+  // Démarrage
+  // ---------------------------------------------------------------------
+  if (!A.configurationComplete) {
+    zone.innerHTML = '<p class="alerte">L\'adresse de la base d\'équipe n\'est pas renseignée sur cet appareil.</p>';
+    return;
+  }
+
+  A.compteLocal().then(function (compte) {
+    if (!compte) { ecranSession(null); return; }
+    A.demarrerSynchronisation();
+    demarrerApplication(compte);
+    rafraichirCompte(compte);
+  }).catch(function () {
+    zone.innerHTML = '<p class="alerte">Cet appareil refuse de conserver les saisies. ' +
+                     'Ouvrez l\'application depuis son adresse internet plutôt que depuis un fichier.</p>';
+  });
+})();
+</script>
+
+</body>
+</html>

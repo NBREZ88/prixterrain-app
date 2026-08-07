@@ -1,22 +1,26 @@
 // PrixTerrain — écran d'accueil.
-// Une recherche unique sur les produits et les fournisseurs, un bouton de
-// saisie, et les derniers prix relevés par l'équipe.
+// Une recherche unique, un bouton de saisie, et les derniers prix relevés
+// par l'équipe présentés en tableau, filtrables par famille.
 
 (function (global) {
   'use strict';
 
   var A = global.PrixTerrain;
-  var CARTES_ACCUEIL = 20;
+  var LIGNES_ACCUEIL = 15;
 
   function afficherAccueil(zone, compte) {
     var C = A.calculs;
     var element = C.element;
     var bouton = C.bouton;
     var contexte = null;
+    var releves = [];
+    var series = {};
+    var familleActive = '';
 
     zone.innerHTML = '';
 
-    // ---- Recherche ----
+    // ---- Recherche et saisie ----
+    var haute = element('div', 'barre-haute');
     var recherche = element('div', 'recherche');
     var champ = element('input', 'champ-recherche');
     champ.type = 'search';
@@ -25,23 +29,11 @@
     var resultats = element('div', 'resultats');
     resultats.style.display = 'none';
     recherche.appendChild(resultats);
-    zone.appendChild(recherche);
-
-    // ---- Saisir ----
-    zone.appendChild(bouton('action-large', 'Saisir un prix', function () {
+    haute.appendChild(recherche);
+    haute.appendChild(bouton('action-large', 'Saisir un prix', function () {
       A.naviguer('saisie');
     }));
-
-    // ---- Résumé ----
-    var resume = element('div', 'resume');
-    zone.appendChild(resume);
-
-    // ---- Derniers prix ----
-    var titre = element('p', 'titre-section', 'Derniers prix relevés');
-    zone.appendChild(titre);
-    var cartes = element('div');
-    cartes.appendChild(element('p', 'appui', 'Lecture…'));
-    zone.appendChild(cartes);
+    zone.appendChild(haute);
 
     champ.addEventListener('input', function () {
       var texte = champ.value.trim();
@@ -82,24 +74,30 @@
       return e;
     }
 
-    Promise.all([C.chargerContexte(), A.relevesRetenus(), A.nombreEnAttente(), A.bd.produit.count()])
+    // ---- Alerte, onglets, tableau ----
+    var alerte = element('div');
+    zone.appendChild(alerte);
+    zone.appendChild(element('p', 'titre-section', 'Derniers prix relevés'));
+    var onglets = element('div', 'sel-onglets');
+    zone.appendChild(onglets);
+    var tableau = element('div', 'tableau-prix');
+    tableau.appendChild(element('p', 'appui', 'Lecture…'));
+    zone.appendChild(tableau);
+
+    Promise.all([C.chargerContexte(), A.relevesRetenus(), A.nombreEnAttente()])
       .then(function (r) {
         contexte = r[0];
-        var releves = r[1];
+        releves = r[1];
 
-        resume.appendChild(bloc(String(releves.length), releves.length > 1 ? 'relevés' : 'relevé'));
-        resume.appendChild(bloc(String(r[3]), 'produits'));
-        if (r[2]) resume.appendChild(bloc(String(r[2]), 'à renvoyer', true));
-
-        cartes.innerHTML = '';
-        if (!releves.length) {
-          cartes.appendChild(element('p', 'vide',
-            'Aucun prix relevé pour l\'instant. Touchez « Saisir un prix » pour commencer.'));
-          return;
+        if (r[2]) {
+          var a = element('div', 'alerte-attente');
+          a.appendChild(element('span', 'alerte-attente-nombre', String(r[2])));
+          a.appendChild(element('span', null,
+            (r[2] > 1 ? 'saisies ne sont pas encore parties' : 'saisie n\'est pas encore partie') +
+            ' à l\'équipe. Elles partiront au retour du réseau.'));
+          alerte.appendChild(a);
         }
 
-        // Relevé précédent du même produit, fournisseur et unité.
-        var series = {};
         releves.forEach(function (x) {
           var p = C.ficheConservee(contexte.produits, x.produit_id);
           var f = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
@@ -107,72 +105,105 @@
           if (!series[cle]) series[cle] = [];
           series[cle].push(x);
         });
-        Object.keys(series).forEach(function (cle) {
-          series[cle].sort(function (a, b) { return String(a.date_prix).localeCompare(String(b.date_prix)); });
-        });
 
-        releves.slice()
-          .sort(function (a, b) { return String(b.saisi_le).localeCompare(String(a.saisi_le)); })
-          .slice(0, CARTES_ACCUEIL)
-          .forEach(function (x) {
-            cartes.appendChild(carte(x, series));
-          });
+        poserOnglets();
+        poserTableau();
       });
 
-    function bloc(valeur, libelle, alerte) {
-      var b = element('div', alerte ? 'bloc-resume bloc-alerte' : 'bloc-resume');
-      b.appendChild(element('span', 'bloc-valeur', valeur));
-      b.appendChild(element('span', 'bloc-libelle', libelle));
-      return b;
+    function familles() {
+      var vues = {};
+      releves.forEach(function (x) {
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        if (p) vues[p.famille_code] = true;
+      });
+      return Object.keys(contexte.familles)
+        .filter(function (code) { return vues[code]; })
+        .sort(function (a, b) { return contexte.familles[a].ordre - contexte.familles[b].ordre; });
     }
 
-    function carte(x, series) {
-      var p = C.ficheConservee(contexte.produits, x.produit_id);
-      var f = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
-      var u = contexte.unites[x.unite_code];
-      var famille = p ? contexte.familles[p.famille_code] : null;
-
-      var c = bouton('carte', '', function () {
-        if (p) A.naviguer('produit', { fiche: p });
+    function poserOnglets() {
+      onglets.innerHTML = '';
+      var codes = familles();
+      if (codes.length < 2) return;
+      var entrees = [['', 'Tout']];
+      codes.forEach(function (code) { entrees.push([code, contexte.familles[code].libelle]); });
+      entrees.forEach(function (e) {
+        onglets.appendChild(bouton(familleActive === e[0] ? 'on' : '', e[1], function () {
+          familleActive = e[0];
+          poserOnglets();
+          poserTableau();
+        }));
       });
+    }
 
-      var haut = element('div', 'carte-haut');
-      haut.appendChild(element('span', 'carte-titre', p ? p.nom : 'Produit non retrouvé'));
-      haut.appendChild(element('span', 'carte-prix',
-        C.nombreFrancais(x.prix_unitaire_ht) + ' ' + (u ? u.libelle : x.unite_code)));
-      c.appendChild(haut);
+    function poserTableau() {
+      tableau.innerHTML = '';
 
-      var bas = element('div', 'carte-bas');
-      bas.appendChild(element('span', 'carte-fournisseur', f ? f.nom : 'Fournisseur non retrouvé'));
-      bas.appendChild(element('span', 'carte-date', C.dateFrancaise(x.date_prix)));
-      c.appendChild(bas);
+      var choisis = releves.filter(function (x) {
+        if (!familleActive) return true;
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        return p && p.famille_code === familleActive;
+      }).sort(function (a, b) {
+        return String(b.date_prix).localeCompare(String(a.date_prix));
+      }).slice(0, LIGNES_ACCUEIL);
 
-      if (famille) {
-        var etiquette = element('span', 'pastille-famille ' + p.famille_code, famille.libelle);
-        c.appendChild(etiquette);
+      if (!choisis.length) {
+        tableau.appendChild(element('p', 'vide', releves.length
+          ? 'Aucun relevé dans cette famille.'
+          : 'Aucun prix relevé pour l\'instant. Touchez « Saisir un prix » pour commencer.'));
+        return;
       }
 
-      var cle = (p ? p.id : '?') + '|' + (f ? f.id : '?') + '|' + x.unite_code;
-      var serie = series[cle] || [];
-      var precedent = null;
-      serie.forEach(function (autre) {
-        if (String(autre.date_prix) >= String(x.date_prix)) return;
-        if (!precedent || String(autre.date_prix) > String(precedent.date_prix)) precedent = autre;
+      var entete = element('div', 'rangee entete');
+      entete.appendChild(element('span', 'col-produit', 'Produit'));
+      var meta = element('span', 'col-meta');
+      meta.appendChild(element('span', 'col-fournisseur', 'Fournisseur'));
+      meta.appendChild(element('span', 'col-date', 'Date'));
+      entete.appendChild(meta);
+      entete.appendChild(element('span', 'col-prix', 'Prix'));
+      entete.appendChild(element('span', 'col-evolution', 'Évolution'));
+      tableau.appendChild(entete);
+
+      choisis.forEach(function (x) {
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        var f = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
+        var u = contexte.unites[x.unite_code];
+
+        var ligne = bouton('rangee', '', function () {
+          if (p) A.naviguer('produit', { fiche: p });
+        });
+        ligne.appendChild(element('span', 'col-produit', p ? p.nom : 'Produit non retrouvé'));
+
+        var m = element('span', 'col-meta');
+        m.appendChild(element('span', 'col-fournisseur', f ? f.nom : 'non retrouvé'));
+        m.appendChild(element('span', 'col-date', C.dateFrancaise(x.date_prix)));
+        ligne.appendChild(m);
+
+        var prix = element('span', 'col-prix');
+        prix.appendChild(element('span', null, C.nombreFrancais(x.prix_unitaire_ht)));
+        prix.appendChild(element('span', 'unite-discrete', ' ' + (u ? u.libelle : x.unite_code)));
+        ligne.appendChild(prix);
+
+        var cle = (p ? p.id : '?') + '|' + (f ? f.id : '?') + '|' + x.unite_code;
+        var serie = series[cle] || [];
+        var precedent = null;
+        serie.forEach(function (autre) {
+          if (String(autre.date_prix) >= String(x.date_prix)) return;
+          if (!precedent || String(autre.date_prix) > String(precedent.date_prix)) precedent = autre;
+        });
+
+        if (!precedent) {
+          ligne.appendChild(element('span', 'col-evolution neutre', 'premier relevé'));
+        } else {
+          var avant = Number(precedent.prix_unitaire_ht);
+          var ecart = (Number(x.prix_unitaire_ht) - avant) / avant * 100;
+          var sens = ecart > 0.05 ? 'hausse' : (ecart < -0.05 ? 'baisse' : 'stable');
+          var fleche = sens === 'hausse' ? '▲ ' : (sens === 'baisse' ? '▼ ' : '= ');
+          ligne.appendChild(element('span', 'col-evolution ' + sens,
+            fleche + (ecart > 0 ? '+' : '') + C.nombreFrancais(ecart, 1) + ' %'));
+        }
+        tableau.appendChild(ligne);
       });
-
-      if (!precedent) {
-        c.appendChild(element('span', 'evolution neutre', 'premier relevé de ce couple'));
-      } else {
-        var avant = Number(precedent.prix_unitaire_ht);
-        var ecart = (Number(x.prix_unitaire_ht) - avant) / avant * 100;
-        var sens = ecart > 0.05 ? 'hausse' : (ecart < -0.05 ? 'baisse' : 'stable');
-        var fleche = sens === 'hausse' ? '▲' : (sens === 'baisse' ? '▼' : '=');
-        c.appendChild(element('span', 'evolution ' + sens,
-          fleche + ' ' + (ecart > 0 ? '+' : '') + C.nombreFrancais(ecart, 1) + ' % depuis le ' +
-          C.dateFrancaise(precedent.date_prix)));
-      }
-
-      return c;
     }
   }
 

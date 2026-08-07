@@ -11,17 +11,19 @@
 <meta name="apple-mobile-web-app-title" content="PrixTerrain">
 <style>
   :root {
-    --vert: #1f4d2c;
-    --vert-clair: #eaf2ec;
-    --vert-vif: #2f6f3e;
-    --terre: #8a5a00;
-    --terre-clair: #fdf3e5;
-    --rouge: #a33a2a;
-    --encre: #17201a;
-    --gris: #5e6a62;
-    --trait: #dfe4e0;
-    --fond: #f6f8f6;
+    --vert: #2f6f4f;
+    --vert-clair: #eef2ef;
+    --vert-vif: #2f6f4f;
+    --terre: #b0741d;
+    --terre-clair: #fdfaf5;
+    --rouge: #a8442f;
+    --encre: #16181a;
+    --gris: #78807f;
+    --trait: #e4e6e2;
+    --fond: #ffffff;
     --carte: #ffffff;
+    --panneau: #fbfbfa;
+    --rail: #fafaf9;
   }
 
   * { box-sizing: border-box; }
@@ -37,10 +39,10 @@
   #entete {
     position: sticky; top: 0; z-index: 20;
     background: var(--vert); color: #fff;
-    padding: calc(env(safe-area-inset-top) + .7rem) 1rem .7rem;
+    padding: calc(env(safe-area-inset-top) + .85rem) 1rem .85rem;
     display: flex; align-items: center; gap: .6rem;
   }
-  #entete h1 { font-size: 1.15rem; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  #entete h1 { font-size: 1.15rem; margin: 0; font-weight: 600; color: #fff; }
   #retour {
     background: none; border: 0; color: #fff; font-size: 1.5rem;
     line-height: 1; padding: 0 .2rem; cursor: pointer; display: none;
@@ -57,20 +59,16 @@
   }
   #barre .onglet-bas {
     flex: 1; background: none; border: 0; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: .15rem;
-    padding: .5rem .2rem .45rem; color: var(--gris); font-size: .72rem; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    padding: .75rem .2rem; color: var(--gris); font-size: .82rem; font-weight: 500;
   }
-  #barre .onglet-bas svg { width: 22px; height: 22px; fill: none;
-                           stroke: currentColor; stroke-width: 1.8;
-                           stroke-linecap: round; stroke-linejoin: round; }
   #barre .onglet-bas.actif { color: var(--vert); }
-  #barre .onglet-bas.actif svg { stroke-width: 2.2; }
 
   /* ---- Recherche ---- */
   .recherche { position: relative; margin-bottom: 1rem; }
   .champ-recherche {
-    width: 100%; font-size: 1.05rem; padding: .85rem 1rem;
-    border: 1px solid var(--trait); border-radius: .75rem; background: var(--carte);
+    width: 100%; height: 3rem; font-size: 1.05rem; padding: 0 1rem;
+    border: 1px solid var(--trait); border-radius: 10px; background: var(--carte);
     -webkit-appearance: none;
   }
   .champ-recherche:focus { outline: 2px solid var(--vert-vif); outline-offset: 1px; }
@@ -90,9 +88,10 @@
 
   /* ---- Bouton principal ---- */
   .action-large {
-    width: 100%; font-size: 1.1rem; font-weight: 600; padding: 1rem;
+    width: 100%; height: 3rem; font-size: 1.05rem; font-weight: 600;
+    padding: 0 1.4rem; line-height: 1;
     background: var(--vert-vif); color: #fff; border: 0;
-    border-radius: .75rem; cursor: pointer; margin-bottom: 1.2rem;
+    border-radius: 10px; cursor: pointer; margin-bottom: 1.2rem;
   }
   .action-large:active { background: var(--vert); }
 
@@ -208,6 +207,167 @@
   .legende-entree { display: flex; align-items: center; gap: .35rem; }
   .pastille { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
   .pied-reglages { margin-top: 1.5rem; }
+
+  /* ---- Accueil : alerte, onglets, tableau ---- */
+  .alerte-attente {
+    display: flex; align-items: center; gap: .7rem;
+    background: var(--terre-clair); border: 1px solid #ead9bd; border-radius: 10px;
+    padding: .7rem .9rem; margin-bottom: 1.5rem; font-size: .9rem; color: #7a5410;
+  }
+  .alerte-attente-nombre { font-size: 1.25rem; font-weight: 700; color: var(--terre); }
+
+  .sel-onglets {
+    display: flex; gap: 1.5rem; border-bottom: 1px solid var(--trait);
+    margin-bottom: 1rem; overflow-x: auto;
+  }
+  .sel-onglets button {
+    background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    padding: .5rem 0 .6rem; font-size: .95rem; color: var(--gris); cursor: pointer;
+    white-space: nowrap;
+  }
+  .sel-onglets button.on { border-bottom-color: var(--vert); color: var(--vert); font-weight: 600; }
+
+  .tableau-prix { width: 100%; }
+  .rangee {
+    display: grid; width: 100%; text-align: left; background: none; border: 0;
+    border-top: 1px solid var(--trait); cursor: pointer;
+    grid-template-columns: minmax(0, 1fr) auto; row-gap: .15rem; column-gap: .8rem;
+    align-items: center; padding: .75rem .5rem;
+    font-family: inherit; font-size: .95rem; color: var(--encre);
+  }
+  .rangee:hover { background: var(--panneau); }
+  .tableau-prix .rangee:last-child { border-bottom: 1px solid var(--trait); }
+  .rangee.entete { display: none; }
+  .col-meta { display: flex; gap: .4rem; grid-row: 2; grid-column: 1; }
+  .col-produit {
+    grid-row: 1; grid-column: 1; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .col-fournisseur, .col-date { color: var(--gris); font-size: .85rem; }
+  .col-prix {
+    grid-row: 1; grid-column: 2; text-align: right; font-size: 1.02rem;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .col-evolution {
+    grid-row: 2; grid-column: 2; text-align: right; font-size: .85rem;
+    font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .unite-discrete { color: var(--gris); font-size: .85rem; font-weight: 400; }
+  .hausse { color: var(--rouge); }
+  .baisse { color: var(--vert); }
+  .stable, .neutre { color: var(--gris); font-weight: 400; }
+
+  /* ---- Liste et détail ---- */
+  .duo { display: block; }
+  .duo-liste { display: block; }
+  .duo-detail { display: none; }
+  .liste-panneau { display: block; }
+  .ligne-panneau {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: none; border: 0; border-bottom: 1px solid var(--trait);
+    padding: .75rem .2rem;
+  }
+  .ligne-panneau:hover { background: var(--panneau); }
+  .ligne-panneau.actif { background: var(--vert-clair); border-left: 3px solid var(--vert); padding-left: .6rem; }
+  .ligne-panneau-nom { display: block; font-size: 1rem; font-weight: 600; color: var(--encre); }
+  .ligne-panneau-appui { display: block; font-size: .82rem; color: var(--gris); margin-top: .1rem; }
+  .surtitre { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+              color: var(--gris); margin: .2rem 0 .5rem; }
+  .entete-fiche { margin-bottom: 1.2rem; }
+  .entete-fiche h2 { margin: .1rem 0 .2rem; font-size: 1.55rem; font-weight: 600; }
+  .sous-titre { font-size: .88rem; color: var(--gris); margin: 0; }
+
+  .cartes-moyenne { display: grid; grid-template-columns: 1fr; gap: .6rem; margin-bottom: 1.4rem; }
+  .carte-moyenne { border: 1px solid var(--trait); border-radius: 10px; padding: .85rem 1rem; }
+  .carte-moyenne.absente { border-style: dashed; background: var(--terre-clair); }
+  .carte-moyenne-tiers { margin: 0; font-size: .82rem; color: var(--gris); }
+  .carte-moyenne-valeur { margin: .1rem 0 .25rem; font-size: 1.6rem; font-weight: 600; }
+  .carte-moyenne-unite { font-size: .95rem; font-weight: 400; color: var(--gris); }
+  .carte-moyenne-absente { margin: .35rem 0 .25rem; font-size: .98rem; color: var(--terre); }
+  .carte-moyenne-appui { margin: 0; font-size: .8rem; color: var(--gris); line-height: 1.5; }
+
+  .tableau { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  .tableau th { font-weight: 400; font-size: .75rem; letter-spacing: .04em;
+                text-transform: uppercase; color: var(--gris); text-align: left; padding: 0 .4rem .5rem 0; }
+  .tableau td { padding: .55rem .4rem .55rem 0; border-top: 1px solid var(--trait); }
+  .tableau .a-droite { text-align: right; }
+  .tableau .discret { color: var(--gris); font-size: .85rem; }
+  .tableau tr.atypique td { color: var(--terre); }
+
+  /* ---- Grilles de cartes ---- */
+  .grille { display: grid; grid-template-columns: 1fr; gap: .6rem; }
+  .barre-haute { display: block; }
+
+  /* ---- Ordinateur : le menu passe à gauche, le contenu s'étale ---- */
+  @media (min-width: 900px) {
+    #entete {
+      padding-left: calc(15rem + 1.5rem); padding-right: 1.5rem;
+      padding-top: 1rem; padding-bottom: 1rem;
+    }
+    #entete h1 { font-size: 1.25rem; }
+    .rangee { grid-template-columns: 40% 15% 15% 15% 15%; row-gap: 0; column-gap: 0; }
+    .col-meta { display: contents; }
+    .col-produit { grid-row: auto; grid-column: auto; padding-right: 1rem; }
+    .col-fournisseur, .col-date { text-align: center; font-size: .9rem; }
+    .col-prix, .col-evolution { grid-row: auto; grid-column: auto; text-align: center; }
+    .col-evolution { font-size: .88rem; }
+    .rangee.entete {
+      display: grid; cursor: default; border-top: 0; border-bottom: 1px solid var(--trait);
+      background: var(--vert-clair); border-radius: 8px 8px 0 0; padding: .7rem .5rem;
+    }
+    .rangee.entete:hover { background: var(--vert-clair); }
+    .rangee.entete span { font-size: .92rem; font-weight: 600; letter-spacing: .02em;
+                          text-transform: uppercase; color: var(--encre); }
+
+    #barre {
+      top: 0; bottom: 0; right: auto; width: 15rem;
+      flex-direction: column; align-items: stretch; justify-content: flex-start;
+      gap: .15rem; padding: 1rem .6rem;
+      border-top: 0; border-right: 1px solid var(--trait); background: var(--rail);
+    }
+    #barre::before {
+      content: 'PrixTerrain'; display: block;
+      padding: .2rem .8rem 1.1rem; font-size: 1.15rem; font-weight: 700; color: var(--vert);
+    }
+    #barre .onglet-bas {
+      flex: 0 0 auto; justify-content: flex-start;
+      padding: .7rem .8rem; font-size: .98rem; border-radius: .6rem; text-align: left;
+    }
+    #barre .onglet-bas:hover { background: var(--fond); }
+    #barre .onglet-bas.actif { background: var(--vert-clair); }
+
+    #application {
+      margin-left: 15rem; max-width: 64rem;
+      padding: 1.5rem 1.5rem 3rem;
+    }
+
+    .grille { grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: .7rem; }
+
+    .duo { display: flex; gap: 0; align-items: flex-start; margin: -1.5rem -1.5rem -3rem; }
+    .duo-liste {
+      width: 21rem; flex: 0 0 21rem; border-right: 1px solid var(--trait);
+      background: var(--panneau); padding: 1.2rem 1rem; min-height: 80vh;
+    }
+    .duo-detail { display: block; flex: 1; padding: 1.5rem 1.8rem 3rem; min-width: 0; }
+    .cartes-moyenne { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+    .ligne-panneau { padding-left: .5rem; padding-right: .5rem; }
+    .ligne-panneau.actif { padding-left: calc(.5rem - 3px); }
+    .barre-haute { display: flex; gap: .8rem; align-items: stretch; }
+    .barre-haute .recherche { flex: 1; margin-bottom: 0; }
+    .barre-haute .action-large { width: auto; white-space: nowrap; margin-bottom: 0; }
+    .resume { max-width: 40rem; }
+    .courbe { max-height: 22rem; }
+    .groupe { padding: 1rem 1.1rem; }
+    .champ, .saisie, .enregistrer { max-width: 34rem; }
+    .action-large { max-width: 34rem; }
+    .propositions, .resultats { max-width: 34rem; }
+  }
+
+  /* ---- Grand écran : trois colonnes de cartes ---- */
+  @media (min-width: 1400px) {
+    #application { max-width: 78rem; }
+    .grille { grid-template-columns: repeat(auto-fill, minmax(23rem, 1fr)); }
+  }
 </style>
 </head>
 <body>
@@ -244,6 +404,7 @@ if ('serviceWorker' in navigator) {
 <script src="rapprochement.js"></script>
 <script src="consultation.js"></script>
 <script src="tiers.js"></script>
+<script src="produits.js"></script>
 <script src="accueil.js"></script>
 <script src="saisie.js"></script>
 <script src="reglages.js"></script>
@@ -381,8 +542,13 @@ if ('serviceWorker' in navigator) {
   // Navigation
   // ---------------------------------------------------------------------
   var ECRANS = {
-    accueil:      { titre: 'PrixTerrain',   afficher: function (z, c) { return A.afficherAccueil(z, c); } },
-    fournisseurs: { titre: 'Fournisseurs',  afficher: function (z, c) { return A.afficherListeFournisseurs(z, c); } },
+    accueil:      { titre: 'Accueil',       afficher: function (z, c) { return A.afficherAccueil(z, c); } },
+    produits:     { titre: 'Produits',      duo: 'produit',
+                    liste: function (z, c, choisir, choisi) { return A.afficherListeProduits(z, c, choisir, choisi); },
+                    detail: function (z, c, p) { return A.afficherFicheProduit(z, c, p); } },
+    fournisseurs: { titre: 'Fournisseurs',  duo: 'fournisseur',
+                    liste: function (z, c, choisir, choisi) { return A.afficherListeFournisseurs(z, c, choisir, choisi); },
+                    detail: function (z, c, p) { return A.afficherFicheFournisseur(z, c, p); } },
     outils:       { titre: 'Outils',        afficher: function (z, c) { return ecranOutils(z, c); } },
     compte:       { titre: 'Mon compte',    afficher: function (z, c) { return A.afficherComptes(z, c); } },
     saisie:       { titre: 'Saisir un prix', afficher: function (z, c) { return A.afficherSaisie(z, c); } },
@@ -393,20 +559,17 @@ if ('serviceWorker' in navigator) {
     reglages:     { titre: 'Réglages',      afficher: function (z, c) { return A.afficherReglages(z, c); } }
   };
 
-  var ICONES = {
-    accueil: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/>',
-    fournisseurs: '<path d="M3 9h18l-1.5 12h-15z"/><path d="M8.5 9V6a3.5 3.5 0 0 1 7 0v3"/>',
-    outils: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/>',
-    compte: '<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>'
-  };
-
-  var ONGLETS = ['accueil', 'fournisseurs', 'outils', 'compte'];
-  var LIBELLES_ONGLETS = { accueil: 'Accueil', fournisseurs: 'Fournisseurs',
-                           outils: 'Outils', compte: 'Compte' };
+  var ONGLETS = ['accueil', 'produits', 'fournisseurs', 'outils', 'compte'];
+  var LIBELLES_ONGLETS = { accueil: 'Accueil', produits: 'Produits',
+                           fournisseurs: 'Fournisseurs', outils: 'Outils', compte: 'Compte' };
 
   var compteCourant = null;
   var ongletCourant = 'accueil';
   var pile = [];
+  var choix = {};
+  var LARGE = 900;
+
+  function estLarge() { return window.innerWidth >= LARGE; }
 
   function naviguer(nom, parametres) {
     if (ONGLETS.indexOf(nom) >= 0) { ongletCourant = nom; pile = []; }
@@ -432,16 +595,55 @@ if ('serviceWorker' in navigator) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'onglet-bas' + (!pile.length && nom === ongletCourant ? ' actif' : '');
-      b.innerHTML = '<svg viewBox="0 0 24 24">' + ICONES[nom] + '</svg><span>' +
-                    LIBELLES_ONGLETS[nom] + '</span>';
+      b.textContent = LIBELLES_ONGLETS[nom];
       b.addEventListener('click', function () { naviguer(nom); });
       barre.appendChild(b);
     });
 
     zone.innerHTML = '';
     entete.scrollIntoView({ block: 'start' });
-    ecran.afficher(zone, compteCourant, courant.parametres);
+
+    if (!ecran.duo) { ecran.afficher(zone, compteCourant, courant.parametres); return; }
+
+    // Liste et détail : côte à côte sur grand écran, l'un après l'autre sinon.
+    var duo = document.createElement('div');
+    duo.className = 'duo';
+    var panneauListe = document.createElement('div');
+    panneauListe.className = 'duo-liste';
+    var panneauDetail = document.createElement('div');
+    panneauDetail.className = 'duo-detail';
+    duo.appendChild(panneauListe);
+    duo.appendChild(panneauDetail);
+    zone.appendChild(duo);
+
+    function choisir(fiche) {
+      choix[courant.nom] = fiche;
+      if (estLarge()) {
+        ecran.liste(panneauListe, compteCourant, choisir, fiche);
+        ecran.detail(panneauDetail, compteCourant, { fiche: fiche });
+      } else {
+        naviguer(ecran.duo, { fiche: fiche });
+      }
+    }
+
+    var retenu = estLarge() ? choix[courant.nom] : null;
+    ecran.liste(panneauListe, compteCourant, choisir, retenu);
+    if (retenu) ecran.detail(panneauDetail, compteCourant, { fiche: retenu });
+    else if (estLarge()) {
+      var vide = document.createElement('p');
+      vide.className = 'vide';
+      vide.textContent = 'Choisissez une fiche dans la liste pour voir ses prix.';
+      panneauDetail.appendChild(vide);
+    }
   }
+
+  // Le passage entre téléphone et ordinateur redessine l'écran courant.
+  var largeAvant = estLarge();
+  window.addEventListener('resize', function () {
+    if (estLarge() === largeAvant) return;
+    largeAvant = estLarge();
+    if (compteCourant) dessiner();
+  });
 
   retour.addEventListener('click', revenir);
 
@@ -457,6 +659,9 @@ if ('serviceWorker' in navigator) {
       entrees.push({ nom: 'reglages', libelle: 'Réglages',
         aide: 'Les durées, seuils et coefficients qui commandent le calcul des prix moyens.' });
     }
+    var grille = document.createElement('div');
+    grille.className = 'grille';
+    z.appendChild(grille);
     entrees.forEach(function (e) {
       var b = document.createElement('button');
       b.type = 'button';
@@ -465,7 +670,7 @@ if ('serviceWorker' in navigator) {
                     '</span><span class="carte-date">›</span></div>' +
                     '<div class="carte-bas"><span>' + e.aide + '</span></div>';
       b.addEventListener('click', function () { naviguer(e.nom); });
-      z.appendChild(b);
+      grille.appendChild(b);
     });
   }
 

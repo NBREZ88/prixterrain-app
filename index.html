@@ -67,7 +67,7 @@
   /* ---- Recherche ---- */
   .recherche { position: relative; margin-bottom: 1rem; }
   .champ-recherche {
-    width: 100%; height: 3rem; font-size: 1.05rem; padding: 0 1rem;
+    flex: 1; width: 100%; height: 3rem; font-size: 1.05rem; padding: 0 1rem;
     border: 1px solid var(--trait); border-radius: 10px; background: var(--carte);
     -webkit-appearance: none;
   }
@@ -208,6 +208,38 @@
   .pastille { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
   .pied-reglages { margin-top: 1.5rem; }
 
+  /* ---- Accueil : recherche plein écran ---- */
+  .recherche { position: relative; display: flex; gap: .6rem; align-items: center; }
+  .annuler { display: none; background: none; border: 0; color: var(--vert); font-size: .95rem;
+             font-family: inherit; cursor: pointer; white-space: nowrap; padding: 0 .2rem; }
+  .en-recherche .annuler { display: block; }
+  .en-recherche .action-large { display: none; }
+  .ecran-resultats { margin-top: .4rem; }
+  .zone-defilante { overflow-y: auto; overflow-x: hidden; }
+  #application.ecran-accueil { display: flex; flex-direction: column; overflow: hidden;
+                               min-height: 0; }
+  #application.ecran-accueil > .barre-haute { flex: 0 0 auto; }
+  #application.ecran-accueil > .ecran-resultats { flex: 1 1 auto; min-height: 0; }
+  .page-accueil { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+  .page-accueil > .alerte-attente,
+  .page-accueil > .titre-section,
+  .page-accueil > .sel-onglets { flex: 0 0 auto; }
+  .ligne-resultat { display: flex; width: 100%; text-align: left; cursor: pointer; gap: 1rem;
+    align-items: center; justify-content: space-between; background: none; border: 0;
+    border-top: 1px solid var(--trait); padding: .8rem .3rem; font-family: inherit; }
+  .ligne-resultat:last-of-type { border-bottom: 1px solid var(--trait); }
+  .ligne-resultat:hover { background: var(--panneau); }
+  .res-gauche { display: block; flex: 1 1 auto; min-width: 0; }
+  .res-droite { display: block; flex: 0 0 auto; text-align: right; white-space: nowrap; }
+  .res-nom { display: block; font-size: 1.02rem; font-weight: 600; color: var(--encre);
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .res-appui { display: block; font-size: .82rem; color: var(--gris); margin-top: .1rem;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .res-prix { display: block; font-size: 1.05rem; color: var(--vert); font-weight: 600; }
+  .acces { display: block; width: 100%; text-align: left; cursor: pointer; margin-top: .6rem;
+    background: var(--carte); border: 1px solid var(--trait); border-radius: 10px;
+    padding: .85rem 1rem; font-size: 1rem; font-family: inherit; color: var(--encre); }
+
   /* ---- Accueil : alerte, onglets, tableau ---- */
   .alerte-attente {
     display: flex; align-items: center; gap: .7rem;
@@ -238,6 +270,11 @@
   .rangee:hover { background: var(--panneau); }
   .tableau-prix .rangee:last-child { border-bottom: 1px solid var(--trait); }
   .rangee.entete { display: none; }
+  .tableau-prix .rangee.entete { position: sticky; top: 0; z-index: 2; background: var(--vert-clair); }
+  .rangee.entete .tri { display: inline-flex; align-items: center; gap: .32rem;
+                        cursor: pointer; user-select: none; }
+  .rangee.entete .tri-ic { display: inline-flex; line-height: 0; }
+  .rangee.entete .actif { color: var(--vert); }
   .col-meta { display: flex; gap: .4rem; grid-row: 2; grid-column: 1; }
   .col-produit {
     grid-row: 1; grid-column: 1; font-weight: 600;
@@ -681,8 +718,34 @@ if ('serviceWorker' in navigator) {
     dessiner();
   }
 
+  // Une zone intérieure prend la hauteur restante ; la page cesse alors de défiler.
+  var aAjuster = [];
+  function ajusterHauteurs() {
+    var barreEl = document.getElementById('barre');
+    var barreBasse = getComputedStyle(barreEl).position === 'fixed' &&
+                     getComputedStyle(barreEl).bottom === '0px' ? barreEl.offsetHeight : 0;
+    var limite = window.innerHeight - barreBasse;
+    aAjuster.forEach(function (zoneEl) {
+      if (!zoneEl.isConnected || !zoneEl.offsetParent) { zoneEl.style.maxHeight = ''; return; }
+      var haut = zoneEl.getBoundingClientRect().top;
+      zoneEl.style.maxHeight = Math.max(140, limite - haut - 8) + 'px';
+    });
+  }
+  function suivreHauteur(zoneEl) {
+    zoneEl.classList.add('zone-defilante');
+    aAjuster.push(zoneEl);
+  }
+  function verrouiller(actif) {
+    document.documentElement.style.overflow = actif ? 'hidden' : '';
+    document.body.style.overflow = actif ? 'hidden' : '';
+    zone.style.overflow = actif ? 'hidden' : '';
+  }
+  window.addEventListener('resize', ajusterHauteurs);
+
   A.naviguer = naviguer;
   A.revenir = revenir;
+  A.ajusterHauteurs = ajusterHauteurs;
+  A.suivreHauteur = suivreHauteur;
 
   // ---------------------------------------------------------------------
   // Démarrage

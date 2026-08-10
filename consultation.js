@@ -93,7 +93,8 @@
       A.bd.agriculteur.toArray(),
       A.bd.unite_prix.toArray(),
       A.bd.famille_produit.toArray(),
-      A.bd.profil.toArray()
+      A.bd.profil.toArray(),
+      A.bd.type_produit.toArray()
     ]).then(function (r) {
       function parIdentifiant(lignes, cle) {
         var t = {};
@@ -106,7 +107,9 @@
         agriculteurs: parIdentifiant(r[2]),
         unites: parIdentifiant(r[3], 'code'),
         familles: parIdentifiant(r[4], 'code'),
-        profils: parIdentifiant(r[5])
+        profils: parIdentifiant(r[5]),
+        types: parIdentifiant(r[6], 'code'),
+        listeTypes: r[6].slice().sort(function (a, b) { return a.ordre - b.ordre; })
       };
     });
   }
@@ -141,15 +144,12 @@
     };
     var aujourdhui = new Date();
     var validite = reglages.valeur('duree_validite', famille);
-    var exclusion = reglages.valeur('anciennete_exclusion', famille);
-    var minimum = reglages.valeur('nombre_minimal_releves', '');
-    var decote = reglages.valeur('decote_mensuelle', '');
 
+    // Un relevé compte tant qu'il est plus récent que la durée de validité de
+    // sa famille. Au-delà, il reste affiché mais n'entre plus dans la moyenne.
     var retenus = releves.filter(function (r) {
-      var age = ageEnMois(r.date_prix, aujourdhui);
-      if (validite !== null && age > validite) return false;
-      if (exclusion !== null && age > exclusion) return false;
-      return true;
+      if (validite === null) return false;
+      return ageEnMois(r.date_prix, aujourdhui) <= validite;
     });
 
     // Médiane par unité, tous fournisseurs confondus, pour le signalement.
@@ -183,18 +183,13 @@
         return (!m || r.date_prix < m) ? r.date_prix : m;
       }, null);
 
-      var calculable = validite !== null && minimum !== null && n >= minimum && n > 0 && plusAncien;
+      // Un seul relevé suffit : la moyenne est la moyenne simple des retenus.
+      var calculable = validite !== null && n > 0 && plusAncien;
       var moyenne = null;
       if (calculable) {
-        var sommePoids = 0;
-        var sommeValeurs = 0;
-        g.releves.forEach(function (r) {
-          var poids = decote === null ? 1 : Math.pow(1 - decote, ageEnMois(r.date_prix, aujourdhui));
-          sommePoids += poids;
-          sommeValeurs += Number(r.prix_unitaire_ht) * poids;
-        });
-        moyenne = sommePoids > 0 ? sommeValeurs / sommePoids : null;
-        if (moyenne === null) calculable = false;
+        var somme = 0;
+        g.releves.forEach(function (r) { somme += Number(r.prix_unitaire_ht); });
+        moyenne = somme / n;
       }
 
       return {
@@ -204,7 +199,6 @@
         plusAncien: plusAncien,
         moyenne: moyenne,
         calculable: calculable,
-        pondere: decote !== null,
         releves: g.releves.slice().sort(function (a, b) {
           return String(b.date_prix).localeCompare(String(a.date_prix));
         })
@@ -220,10 +214,9 @@
       retenus: retenus,
       lignes: lignes,
       medianes: medianes,
+      validite: validite,
       validiteAbsente: validite === null,
-      minimumAbsent: minimum === null,
-      seuilAtypique: reglages.valeur('ecart_atypique', ''),
-      decote: decote
+      seuilAtypique: reglages.valeur('ecart_atypique', '')
     };
   }
 
@@ -348,7 +341,8 @@
       var entete = element('div', 'entete-fiche');
       entete.appendChild(element('p', 'surtitre',
         (famille ? famille.libelle : produit.famille_code) +
-        (produit.segment ? ' · ' + produit.segment : '')));
+        (produit.type_code && contexte.types && contexte.types[produit.type_code]
+          ? ' · ' + contexte.types[produit.type_code].libelle : '')));
       entete.appendChild(element('h2', null, produit.nom));
       entete.appendChild(element('p', 'sous-titre', releves.length
         ? 'Dernier relevé le ' + dateFrancaise(dates[dates.length - 1])
@@ -364,22 +358,15 @@
         }
       });
       var duBloc = res.retenus.filter(function (x) { return x.unite_code === uniteDominante; });
-      var minimum = reglages.valeur('nombre_minimal_releves', '');
-      var decote = reglages.valeur('decote_mensuelle', '');
+
       var aujourdhui = new Date();
 
       var globale = null, plusAncienGlobal = null;
-      if (minimum !== null && duBloc.length >= minimum) {
-        var sp = 0, sv = 0;
-        duBloc.forEach(function (x) {
-          var poids = decote === null ? 1 : Math.pow(1 - decote, ageEnMois(x.date_prix, aujourdhui));
-          sp += poids;
-          sv += Number(x.prix_unitaire_ht) * poids;
-        });
-        if (sp > 0) {
-          globale = sv / sp;
-          plusAncienGlobal = duBloc.map(function (x) { return x.date_prix; }).sort()[0];
-        }
+      if (duBloc.length) {
+        var somme = 0;
+        duBloc.forEach(function (x) { somme += Number(x.prix_unitaire_ht); });
+        globale = somme / duBloc.length;
+        plusAncienGlobal = duBloc.map(function (x) { return x.date_prix; }).sort()[0];
       }
 
       var derniers = {}, meilleur = null;
@@ -403,19 +390,19 @@
         v.appendChild(element('span', 'cp-unite', ' ' + (u ? u.libelle : uniteDominante)));
         bloc.appendChild(v);
         var pastilles = element('div', 'cp-pastilles');
-        [duBloc.length + ' relevés',
-         'depuis ' + dateFrancaise(plusAncienGlobal),
-         decote === null ? 'non pondérée' : 'pondérée'].forEach(function (t) {
-          pastilles.appendChild(element('span', 'cp-pastille', t));
-        });
+        pastilles.appendChild(element('span',
+          'cp-pastille' + (duBloc.length < 3 ? ' peu' : ''),
+          duBloc.length + (duBloc.length > 1 ? ' relevés' : ' relevé')));
+        pastilles.appendChild(element('span', 'cp-pastille',
+          'depuis ' + dateFrancaise(plusAncienGlobal)));
         bloc.appendChild(pastilles);
       } else {
         bloc.appendChild(element('p', 'cp-valeur-absente', releves.length
           ? 'Pas encore assez de relevés' : 'Aucun relevé pour ce produit'));
         bloc.appendChild(element('p', 'cp-appui', releves.length
-          ? (minimum === null
-             ? 'Le nombre minimal de relevés n\'est pas renseigné dans les Réglages.'
-             : duBloc.length + ' relevés retenus, il en faut ' + minimum + '.')
+          ? (res.validiteAbsente
+             ? 'La durée de validité n\'est pas renseignée dans les Réglages.'
+             : 'Tous ses relevés ont plus de ' + nombreFrancais(res.validite, 0) + ' mois.')
           : 'Il figure au catalogue, son prix n\'a pas encore été relevé.'));
       }
       if (meilleur) {
@@ -433,8 +420,7 @@
       zone.appendChild(bloc);
 
       // --- réglages manquants ---
-      [['duree_validite', produit.famille_code], ['anciennete_exclusion', produit.famille_code],
-       ['nombre_minimal_releves', ''], ['decote_mensuelle', ''], ['ecart_atypique', '']]
+      [['duree_validite', produit.famille_code], ['ecart_atypique', '']]
         .forEach(function (paire) {
           if (reglages.valeur(paire[0], paire[1]) === null) {
             zone.appendChild(encartReglageManquant(reglages, paire[0], paire[1]));
@@ -442,6 +428,12 @@
         });
 
       // --- onglets ---
+      var actions = element('div', 'actions-fiche');
+      actions.appendChild(bouton('action-fiche', 'Saisir un prix pour ce produit', function () {
+        A.naviguer('saisie', { produit: produit });
+      }));
+      zone.appendChild(actions);
+
       var ongletCourant = 'comparaison';
       var onglets = element('div', 'onglets-fiche');
       var contenu = element('div');
@@ -511,8 +503,7 @@
 
           if (!l.calculable) {
             ligne.className = 'rangee attention';
-            ligne.appendChild(element('span', 'col-evolution neutre',
-              minimum === null ? 'minimum non réglé' : 'minimum ' + minimum));
+            ligne.appendChild(element('span', 'col-evolution neutre', 'non calculable'));
           } else if (l.moyenne === moinsCher) {
             ligne.className = 'rangee mieux';
             ligne.appendChild(element('span', 'col-evolution baisse', '▼ le moins cher'));
@@ -539,25 +530,32 @@
         entete.appendChild(element('span', 'col-evolution', 'Écart au médian'));
         tableau.appendChild(entete);
 
-        var toutes = [];
-        res.lignes.forEach(function (l) {
-          l.releves.forEach(function (x) { toutes.push({ ligne: l, releve: x }); });
-        });
-        toutes.sort(function (a, b) {
-          return String(b.releve.date_prix).localeCompare(String(a.releve.date_prix));
-        });
+        var aujourdhui = new Date();
+        var perimes = 0;
 
-        toutes.forEach(function (o) {
-          var x = o.releve;
+        // L'historique montre tout. Un relevé périmé reste visible, en gris.
+        releves.slice().sort(function (a, b) {
+          return String(b.date_prix).localeCompare(String(a.date_prix));
+        }).forEach(function (x) {
+          var perime = res.validite === null ||
+                       ageEnMois(x.date_prix, aujourdhui) > res.validite;
+          if (perime) perimes++;
+
           var med = res.medianes[x.unite_code];
-          var ecart = med ? (Number(x.prix_unitaire_ht) - med) / med * 100 : null;
-          var atypique = o.ligne.calculable && med && res.seuilAtypique !== null &&
+          var ecart = (!perime && med)
+            ? (Number(x.prix_unitaire_ht) - med) / med * 100 : null;
+          var atypique = ecart !== null && res.seuilAtypique !== null &&
                          Math.abs(ecart) > res.seuilAtypique;
-          var auteur = contexte.profils[x.saisi_par];
+
+          var f = ficheConservee(contexte.fournisseurs, x.fournisseur_id);
+          var auteur = contexte.profils ? contexte.profils[x.saisi_par] : null;
           var u = contexte.unites[x.unite_code];
 
-          var ligne = element('div', atypique ? 'rangee attention' : 'rangee');
-          ligne.appendChild(element('span', 'col-produit', o.ligne.nomGroupe));
+          var ligne = element('div', 'rangee' + (atypique ? ' attention' : '') +
+                                     (perime ? ' perime' : ''));
+          ligne.appendChild(element('span', 'col-produit',
+            f ? f.nom : 'fiche non retrouvée'));
+
           var meta = element('span', 'col-meta');
           meta.appendChild(element('span', 'col-fournisseur', auteur ? auteur.nom : ''));
           meta.appendChild(element('span', 'col-date', dateFrancaise(x.date_prix)));
@@ -565,10 +563,13 @@
 
           var prix = element('span', 'col-prix');
           prix.appendChild(element('span', null, nombreFrancais(x.prix_unitaire_ht)));
-          prix.appendChild(element('span', 'unite-discrete', ' ' + (u ? u.libelle : x.unite_code)));
+          prix.appendChild(element('span', 'unite-discrete',
+            ' ' + (u ? u.libelle : x.unite_code)));
           ligne.appendChild(prix);
 
-          if (ecart === null) {
+          if (perime) {
+            ligne.appendChild(element('span', 'col-evolution neutre', 'ne compte plus'));
+          } else if (ecart === null) {
             ligne.appendChild(element('span', 'col-evolution neutre', '—'));
           } else if (atypique) {
             ligne.appendChild(element('span', 'col-evolution hausse',
@@ -581,7 +582,15 @@
           }
           tableau.appendChild(ligne);
         });
+
         contenu.appendChild(tableau);
+
+        if (perimes && res.validite !== null) {
+          contenu.appendChild(element('p', 'note-perimes',
+            perimes + (perimes > 1 ? ' relevés ont ' : ' relevé a ') + 'plus de ' +
+            nombreFrancais(res.validite, 0) +
+            ' mois : ils restent visibles mais n\'entrent plus dans le prix moyen.'));
+        }
       }
 
       poserOnglets();

@@ -235,6 +235,7 @@
   #application.ecran-fiche { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
   #application.ecran-fiche > .entete-fiche,
   #application.ecran-fiche > .chiffre-principal,
+  #application.ecran-fiche > .actions-fiche,
   #application.ecran-fiche > .manquant,
   #application.ecran-fiche > .onglets-fiche { flex: 0 0 auto; }
   .entete-fiche { margin-bottom: .6rem; }
@@ -275,6 +276,16 @@
   }
   .ecran-fiche .tableau-prix .rangee.mieux { border-color: var(--vert); background: var(--vert-clair); }
   .ecran-fiche .tableau-prix .rangee.attention { border-color: #ead9bd; background: var(--terre-clair); }
+  .ecran-fiche .tableau-prix .rangee.perime { background: var(--panneau); }
+  .rangee.perime .col-produit, .rangee.perime .col-prix { color: var(--gris); font-weight: 500; }
+  .note-perimes { margin: .6rem 0 0; font-size: .82rem; color: var(--gris); line-height: 1.5; }
+  .cp-pastille.peu { border-color: #ead9bd; background: var(--terre-clair); color: var(--terre);
+                     font-weight: 600; }
+  .actions-fiche { margin-bottom: .7rem; }
+  .action-fiche { width: 100%; background: #fff; border: 1px solid var(--vert);
+                  color: var(--vert); border-radius: 8px; padding: .6rem 1rem;
+                  font-size: .95rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .action-fiche:hover { background: var(--vert-clair); }
   .ecran-fiche .tableau-prix .rangee .col-produit { font-size: 1rem; }
   .ecran-fiche .tableau-prix .rangee .col-prix { font-size: 1.12rem; font-weight: 700; }
 
@@ -667,7 +678,7 @@ if ('serviceWorker' in navigator) {
 
     outils:       { titre: 'Outils',        afficher: function (z, c) { return ecranOutils(z, c); } },
     compte:       { titre: 'Mon compte',    afficher: function (z, c) { return A.afficherComptes(z, c); } },
-    saisie:       { titre: 'Saisir un prix', afficher: function (z, c) { return A.afficherSaisie(z, c); } },
+    saisie:       { titre: 'Saisir un prix', afficher: function (z, c, p) { return A.afficherSaisie(z, c, p); } },
     produit:      { titre: 'Fiche produit', afficher: function (z, c, p) { return A.afficherFicheProduit(z, c, p); } },
     fournisseur:  { titre: 'Fiche fournisseur', afficher: function (z, c, p) { return A.afficherFicheFournisseur(z, c, p); } },
     export:       { titre: 'Export tableur', afficher: function (z, c) { return A.afficherExport(z, c); } },

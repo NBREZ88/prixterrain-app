@@ -7,20 +7,14 @@
 
   var A = global.PrixTerrain;
 
-  // Vocabulaire fermé, écrit dans la colonne segment de la fiche produit.
-  var TYPES = {
-    PHYTO: ['Herbicide', 'Fongicide', 'Insecticide', 'Molluscicide', 'Régulateur',
-            'Adjuvant', 'Traitement de semence', 'Moyen biologique', 'Non classé'],
-    SEMENCE: ['Blé', 'Orge', 'Colza', 'Maïs', 'Tournesol', 'Protéagineux', 'Fourragère'],
-    ENGRAIS: []
-  };
 
   function aujourdhui() {
     var d = new Date();
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   }
 
-  function afficherSaisie(zone, compte) {
+  function afficherSaisie(zone, compte, parametres) {
+    parametres = parametres || {};
     var C = A.calculs;
     var element = C.element;
     var bouton = C.bouton;
@@ -126,22 +120,37 @@
         unites = r[1];
         familles = r[2];
 
+        if (parametres.produit) {
+          produitChoisi = parametres.produit;
+          champP.value = parametres.produit.nom;
+          majRappel();
+        }
+
         unites.forEach(function (u) { champU.appendChild(new Option(u.libelle, u.code)); });
         if (unites.some(function (u) { return u.code === 'L'; })) champU.value = 'L';
 
         champFam.appendChild(new Option('à choisir', ''));
         familles.forEach(function (f) { champFam.appendChild(new Option(f.libelle, f.code)); });
         majTypes();
+
+        // Le curseur va au premier champ encore vide.
+        (champF.value ? champPrix : champF).focus();
       });
 
     champFam.addEventListener('change', majTypes);
+    function typesDe(famille) {
+      if (!contexte || !contexte.listeTypes) return [];
+      return contexte.listeTypes.filter(function (t) {
+        return t.famille_code === famille && t.actif !== false;
+      });
+    }
     function majTypes() {
-      var liste = TYPES[champFam.value] || [];
+      var liste = typesDe(champFam.value);
       champType.innerHTML = '';
       if (!liste.length) { caseType.style.display = 'none'; return; }
       caseType.style.display = 'block';
       champType.appendChild(new Option('à choisir', ''));
-      liste.forEach(function (t) { champType.appendChild(new Option(t, t)); });
+      liste.forEach(function (t) { champType.appendChild(new Option(t.libelle, t.code)); });
     }
 
     // ---- propositions ----
@@ -251,7 +260,7 @@
       if (!produitChoisi && !champFam.value) {
         return signaler('Indiquez la famille de ce nouveau produit.');
       }
-      if (!produitChoisi && (TYPES[champFam.value] || []).length && !champType.value) {
+      if (!produitChoisi && typesDe(champFam.value).length && !champType.value) {
         return signaler('Indiquez le type de ce nouveau produit.');
       }
 
@@ -270,7 +279,7 @@
           return A.enregistrerFiche('produit', {
             nom: nomP,
             famille_code: champFam.value,
-            segment: champType.value || null,
+            type_code: champType.value || null,
             unite_code: champU.value
           }).then(function (p) {
             produitChoisi = p;

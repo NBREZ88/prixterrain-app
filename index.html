@@ -208,6 +208,76 @@
   .pastille { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
   .pied-reglages { margin-top: 1.5rem; }
 
+  /* ---- Saisie en série ---- */
+  .barre-rapide { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; align-items: end;
+    padding: .9rem; background: var(--panneau); border: 1px solid var(--trait);
+    border-radius: 10px; margin-bottom: 1rem; }
+  .barre-rapide .case-large { grid-column: 1 / -1; }
+  .barre-rapide .etiquette { font-size: .78rem; }
+  .barre-rapide .saisie { height: 2.7rem; font-size: .95rem; }
+  .barre-rapide .propositions { position: relative; z-index: 3; }
+  .ajouter { grid-column: 1 / -1; height: 3rem; background: var(--vert); color: #fff;
+    border: 0; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; }
+  .rappel { background: var(--vert-clair); border-radius: 8px; padding: .65rem .85rem;
+    font-size: .9rem; margin: 0 0 1rem; color: #1f4d38; line-height: 1.5; }
+  .creation-produit { background: var(--terre-clair); border: 1px solid #ead9bd;
+    border-radius: 10px; padding: .8rem .9rem; margin: 0 0 1rem; }
+  .creation-titre { margin: 0 0 .7rem; font-size: .9rem; color: #7a5410; }
+  .creation-lignes { display: grid; grid-template-columns: 1fr; gap: .6rem; }
+  .actions { display: flex; flex-direction: column; gap: .8rem; align-items: center;
+    margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--trait); }
+  .fin-session { display: block; margin: 0 auto; background: none; border: 0;
+    color: var(--vert); font-size: 1rem; text-decoration: underline; cursor: pointer;
+    font-family: inherit; padding: .5rem .4rem; }
+
+  /* ---- Fiche produit ---- */
+  #application.ecran-fiche { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  #application.ecran-fiche > .entete-fiche,
+  #application.ecran-fiche > .chiffre-principal,
+  #application.ecran-fiche > .manquant,
+  #application.ecran-fiche > .onglets-fiche { flex: 0 0 auto; }
+  .entete-fiche { margin-bottom: .6rem; }
+  .entete-fiche h2 { margin: 0; font-size: 1.35rem; font-weight: 600; line-height: 1.2; }
+  .surtitre { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
+              color: var(--gris); margin: 0 0 .1rem; }
+  .sous-titre { font-size: .82rem; color: var(--gris); margin: .1rem 0 0; }
+  .chiffre-principal { background: var(--vert-clair); border-radius: 10px;
+                       padding: .7rem 1rem .75rem; margin-bottom: .7rem; }
+  .chiffre-principal.absent { background: var(--terre-clair); border: 1px dashed #ead9bd; }
+  .cp-question { margin: 0; font-size: .88rem; color: #3d6b55; }
+  .chiffre-principal.absent .cp-question { color: var(--terre); }
+  .cp-valeur { margin: .05rem 0 .35rem; font-size: 2.2rem; font-weight: 700; line-height: 1.05;
+               color: #1f4d38; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .cp-unite { font-size: 1.1rem; font-weight: 500; color: #3d6b55; }
+  .cp-valeur-absente { margin: .15rem 0 .3rem; font-size: 1.3rem; font-weight: 700; color: var(--terre); }
+  .cp-appui { margin: 0; font-size: .9rem; color: #7a5410; }
+  .cp-pastilles { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .cp-pastille { border: 1px solid #c3ddd0; border-radius: 1rem; padding: .1rem .6rem;
+                 font-size: .78rem; color: #3d6b55; }
+  .cp-meilleur { margin: .6rem 0 0; padding-top: .5rem; font-size: .88rem;
+                 border-top: 1px solid #c3ddd0; color: #3d6b55; }
+  .chiffre-principal.absent .cp-meilleur { border-top-color: #ead9bd; color: var(--gris); }
+  .cp-meilleur-etq { color: #3d6b55; }
+  .cp-meilleur b { font-weight: 700; color: #1f4d38; }
+  .onglets-fiche { display: flex; gap: 1.4rem; border-bottom: 1px solid var(--trait);
+                   margin-bottom: .7rem; overflow-x: auto;
+                   scrollbar-width: none; -ms-overflow-style: none; }
+  .onglets-fiche::-webkit-scrollbar { display: none; }
+  .onglets-fiche button { background: none; border: 0; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; padding: .4rem 0 .5rem; font-size: .92rem; color: var(--gris);
+    cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .onglets-fiche button.on { border-bottom-color: var(--vert); color: var(--vert); font-weight: 600; }
+
+  .ecran-fiche .tableau-prix .rangee {
+    border: 1px solid var(--trait); border-radius: 10px; margin-bottom: .5rem;
+    padding: .65rem .8rem; row-gap: .25rem;
+  }
+  .ecran-fiche .tableau-prix .rangee.mieux { border-color: var(--vert); background: var(--vert-clair); }
+  .ecran-fiche .tableau-prix .rangee.attention { border-color: #ead9bd; background: var(--terre-clair); }
+  .ecran-fiche .tableau-prix .rangee .col-produit { font-size: 1rem; }
+  .ecran-fiche .tableau-prix .rangee .col-prix { font-size: 1.12rem; font-weight: 700; }
+
   /* ---- Accueil : recherche plein écran ---- */
   .recherche { position: relative; display: flex; gap: .6rem; align-items: center; }
   .annuler { display: none; background: none; border: 0; color: var(--vert); font-size: .95rem;
@@ -348,6 +418,21 @@
     .col-fournisseur, .col-date { text-align: center; font-size: .9rem; }
     .col-prix, .col-evolution { grid-row: auto; grid-column: auto; text-align: center; }
     .col-evolution { font-size: .88rem; }
+    .barre-rapide { grid-template-columns: 1.3fr 1.3fr .8fr .8fr auto; }
+    .barre-rapide .case-large { grid-column: auto; }
+    .ajouter { grid-column: auto; height: 2.7rem; padding: 0 1.2rem; font-size: .95rem; }
+    .creation-lignes { grid-template-columns: 1fr 1fr; max-width: 32rem; }
+    .actions .fin-session { max-width: 26rem; }
+    .cp-valeur { font-size: 2.5rem; }
+    .ecran-fiche .tableau-prix .rangee {
+      border: 0; border-top: 1px solid var(--trait); border-radius: 0;
+      margin-bottom: 0; padding: .75rem .5rem; row-gap: 0;
+    }
+    .ecran-fiche .tableau-prix .rangee:last-child { border-bottom: 1px solid var(--trait); }
+    .ecran-fiche .tableau-prix .rangee .col-produit { font-size: inherit; font-weight: 600; }
+    .ecran-fiche .tableau-prix .rangee .col-prix { font-size: inherit; font-weight: inherit; }
+    .ecran-fiche .tableau-prix .rangee.mieux { background: var(--vert-clair); }
+    .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
     .rangee.entete {
       display: grid; cursor: default; border-top: 0; border-bottom: 1px solid var(--trait);
       background: var(--vert-clair); border-radius: 8px 8px 0 0; padding: .7rem .5rem;
@@ -441,7 +526,6 @@ if ('serviceWorker' in navigator) {
 <script src="rapprochement.js"></script>
 <script src="consultation.js"></script>
 <script src="tiers.js"></script>
-<script src="produits.js"></script>
 <script src="accueil.js"></script>
 <script src="saisie.js"></script>
 <script src="reglages.js"></script>
@@ -580,12 +664,7 @@ if ('serviceWorker' in navigator) {
   // ---------------------------------------------------------------------
   var ECRANS = {
     accueil:      { titre: 'Accueil',       afficher: function (z, c) { return A.afficherAccueil(z, c); } },
-    produits:     { titre: 'Produits',      duo: 'produit',
-                    liste: function (z, c, choisir, choisi) { return A.afficherListeProduits(z, c, choisir, choisi); },
-                    detail: function (z, c, p) { return A.afficherFicheProduit(z, c, p); } },
-    fournisseurs: { titre: 'Fournisseurs',  duo: 'fournisseur',
-                    liste: function (z, c, choisir, choisi) { return A.afficherListeFournisseurs(z, c, choisir, choisi); },
-                    detail: function (z, c, p) { return A.afficherFicheFournisseur(z, c, p); } },
+
     outils:       { titre: 'Outils',        afficher: function (z, c) { return ecranOutils(z, c); } },
     compte:       { titre: 'Mon compte',    afficher: function (z, c) { return A.afficherComptes(z, c); } },
     saisie:       { titre: 'Saisir un prix', afficher: function (z, c) { return A.afficherSaisie(z, c); } },
@@ -596,9 +675,8 @@ if ('serviceWorker' in navigator) {
     reglages:     { titre: 'Réglages',      afficher: function (z, c) { return A.afficherReglages(z, c); } }
   };
 
-  var ONGLETS = ['accueil', 'produits', 'fournisseurs', 'outils', 'compte'];
-  var LIBELLES_ONGLETS = { accueil: 'Accueil', produits: 'Produits',
-                           fournisseurs: 'Fournisseurs', outils: 'Outils', compte: 'Compte' };
+  var ONGLETS = ['accueil', 'outils', 'compte'];
+  var LIBELLES_ONGLETS = { accueil: 'Accueil', outils: 'Outils', compte: 'Compte' };
 
   var compteCourant = null;
   var ongletCourant = 'accueil';

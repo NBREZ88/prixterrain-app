@@ -7,7 +7,6 @@ var VERSION = 'prixterrain-23';
 
 var FICHIERS = [
   './',
-  './index.html',
   './configuration.js',
   './base.js',
   './saisie.js',

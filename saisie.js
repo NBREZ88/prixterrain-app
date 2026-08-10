@@ -1,303 +1,350 @@
-// PrixTerrain — écran de saisie d'un prix.
-// Trois champs visibles : fournisseur, produit, prix accompagné de son unité.
-// Date et remarque sont derrière le bouton « Détails », replié au départ.
+// PrixTerrain — saisie en série.
+// Le fournisseur reste d'une ligne à l'autre, le produit et le prix se vident.
+// Un produit inconnu se crée sur place, en donnant sa famille et son type.
 
 (function (global) {
   'use strict';
 
   var A = global.PrixTerrain;
-  var CARACTERES_AVANT_PROPOSITIONS = 3;
+
+  // Vocabulaire fermé, écrit dans la colonne segment de la fiche produit.
+  var TYPES = {
+    PHYTO: ['Herbicide', 'Fongicide', 'Insecticide', 'Molluscicide', 'Régulateur',
+            'Adjuvant', 'Traitement de semence', 'Moyen biologique', 'Non classé'],
+    SEMENCE: ['Blé', 'Orge', 'Colza', 'Maïs', 'Tournesol', 'Protéagineux', 'Fourragère'],
+    ENGRAIS: []
+  };
 
   function aujourdhui() {
     var d = new Date();
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   }
 
-  function element(balise, classe, texte) {
-    var e = global.document.createElement(balise);
-    if (classe) e.className = classe;
-    if (texte !== undefined) e.textContent = texte;
-    return e;
-  }
+  function afficherSaisie(zone, compte) {
+    var C = A.calculs;
+    var element = C.element;
+    var bouton = C.bouton;
 
-  function bouton(classe, texte, action) {
-    var b = element('button', classe, texte);
-    b.type = 'button';
-    b.addEventListener('click', action);
-    return b;
-  }
+    var contexte = null;
+    var unites = [];
+    var familles = [];
+    var fournisseurChoisi = null;
+    var produitChoisi = null;
+    var session = [];
 
-  // -------------------------------------------------------------------------
-  // Champ à propositions : les fiches déjà connues s'affichent d'abord,
-  // le bouton d'ajout n'apparaît qu'en dessous de la liste.
-  // -------------------------------------------------------------------------
-  function creerChampRecherche(options) {
-    var conteneur = element('div', 'champ');
-    var valeur = null;
+    zone.innerHTML = '';
 
-    function definir(nouvelle, avecFocus) {
-      valeur = nouvelle;
-      dessiner(avecFocus);
-      if (options.surChangement) options.surChangement(valeur);
-    }
+    // ---- barre de saisie ----
+    var barre = element('div', 'barre-rapide');
 
-    function dessiner(avecFocus) {
-      conteneur.innerHTML = '';
-      conteneur.appendChild(element('span', 'etiquette', options.libelle));
+    var caseF = element('div', 'case-large');
+    caseF.appendChild(element('span', 'etiquette', 'Fournisseur'));
+    var champF = element('input', 'saisie');
+    champF.type = 'text';
+    champF.placeholder = 'Nom du fournisseur';
+    var listeF = element('div', 'propositions');
+    listeF.style.display = 'none';
+    caseF.appendChild(champF);
+    caseF.appendChild(listeF);
+    barre.appendChild(caseF);
 
-      if (valeur) {
-        var fait = element('div', 'choix-fait');
-        fait.appendChild(element('span', 'choix-nom', valeur.nom));
-        fait.appendChild(bouton('lien', 'Changer', function () { definir(null, true); }));
-        conteneur.appendChild(fait);
-        return;
-      }
+    var caseP = element('div', 'case-large');
+    caseP.appendChild(element('span', 'etiquette', 'Produit'));
+    var champP = element('input', 'saisie');
+    champP.type = 'text';
+    champP.placeholder = 'Nom du produit';
+    var listeP = element('div', 'propositions');
+    listeP.style.display = 'none';
+    caseP.appendChild(champP);
+    caseP.appendChild(listeP);
+    barre.appendChild(caseP);
 
-      var champ = element('input', 'saisie');
-      champ.type = 'text';
-      champ.placeholder = options.exemple;
-      var liste = element('div', 'propositions');
-      liste.style.display = 'none';
-      conteneur.appendChild(champ);
-      conteneur.appendChild(liste);
+    var casePrix = element('div');
+    casePrix.appendChild(element('span', 'etiquette', 'Prix'));
+    var champPrix = element('input', 'saisie');
+    champPrix.type = 'text';
+    champPrix.inputMode = 'decimal';
+    champPrix.placeholder = '0,00';
+    casePrix.appendChild(champPrix);
+    barre.appendChild(casePrix);
 
-      champ.addEventListener('input', function () {
-        var texte = champ.value.trim();
-        if (texte.length < CARACTERES_AVANT_PROPOSITIONS) {
-          liste.style.display = 'none';
-          liste.innerHTML = '';
-          return;
-        }
-        A.rechercherFiches(options.table, texte, 8)
-          .then(function (lignes) {
-            if (champ.value.trim() !== texte) return;
-            liste.innerHTML = '';
-            liste.style.display = 'block';
-            lignes.forEach(function (ligne) {
-              liste.appendChild(bouton('proposition', ligne.nom, function () { definir(ligne, false); }));
-            });
-            if (!lignes.length) liste.appendChild(element('p', 'aucune', 'Rien de connu sous ce nom.'));
-            liste.appendChild(bouton('lien creation', 'Ajouter « ' + texte + ' »', function () {
-              options.surCreation(texte, function (fiche) { definir(fiche, false); });
-            }));
-          });
-      });
+    var caseU = element('div');
+    caseU.appendChild(element('span', 'etiquette', 'Unité'));
+    var champU = element('select', 'saisie');
+    caseU.appendChild(champU);
+    barre.appendChild(caseU);
 
-      if (avecFocus) champ.focus();
-    }
+    barre.appendChild(bouton('ajouter', 'Ajouter', ajouter));
+    zone.appendChild(barre);
 
-    dessiner(false);
-    return {
-      element: conteneur,
-      lire: function () { return valeur; },
-      vider: function () { definir(null, false); }
-    };
-  }
+    var rappel = element('p', 'rappel');
+    rappel.style.display = 'none';
+    zone.appendChild(rappel);
 
-  // -------------------------------------------------------------------------
-  // Fenêtre d'ajout d'une fiche
-  // -------------------------------------------------------------------------
-  function ouvrirAjout(table, nom, unites, familles, surAjout) {
-    var fenetre = element('div', 'fenetre');
-    var contenu = element('div', 'fenetre-contenu');
-    contenu.appendChild(element('h2', null, 'Ajouter « ' + nom + ' »'));
+    // ---- encart de création d'un produit ----
+    var creation = element('div', 'creation-produit');
+    creation.style.display = 'none';
+    var titreCreation = element('p', 'creation-titre');
+    creation.appendChild(titreCreation);
+    var lignesCreation = element('div', 'creation-lignes');
 
-    var choixFamille = null;
-    var choixUnite = null;
+    var caseFam = element('div');
+    caseFam.appendChild(element('span', 'etiquette', 'Famille'));
+    var champFam = element('select', 'saisie');
+    caseFam.appendChild(champFam);
+    lignesCreation.appendChild(caseFam);
+
+    var caseType = element('div');
+    caseType.appendChild(element('span', 'etiquette', 'Type'));
+    var champType = element('select', 'saisie');
+    caseType.appendChild(champType);
+    lignesCreation.appendChild(caseType);
+    creation.appendChild(lignesCreation);
+    zone.appendChild(creation);
+
     var alerte = element('p', 'alerte');
     alerte.style.display = 'none';
+    zone.appendChild(alerte);
 
-    if (table === 'produit') {
-      var champFamille = element('div', 'champ');
-      champFamille.appendChild(element('span', 'etiquette', 'Famille'));
-      choixFamille = element('select', 'saisie');
-      choixFamille.appendChild(new Option('à choisir', ''));
-      familles.forEach(function (f) { choixFamille.appendChild(new Option(f.libelle, f.code)); });
-      champFamille.appendChild(choixFamille);
-      contenu.appendChild(champFamille);
+    var titreSession = element('p', 'titre-section', 'Saisis à l\'instant');
+    titreSession.style.display = 'none';
+    var tableau = element('div', 'tableau-prix');
+    zone.appendChild(titreSession);
+    zone.appendChild(tableau);
 
-      var champUnite = element('div', 'champ');
-      champUnite.appendChild(element('span', 'etiquette', 'Prix habituellement exprimé'));
-      choixUnite = element('select', 'saisie');
-      choixUnite.appendChild(new Option('à préciser plus tard', ''));
-      unites.forEach(function (u) { choixUnite.appendChild(new Option(u.libelle_long, u.code)); });
-      champUnite.appendChild(choixUnite);
-      contenu.appendChild(champUnite);
+    var pied = element('div', 'actions');
+    pied.appendChild(bouton('fin-session', 'Terminer et revenir à l\'accueil', function () {
+      A.naviguer('accueil');
+    }));
+    zone.appendChild(pied);
+
+    // ---- chargement ----
+    Promise.all([C.chargerContexte(), A.bd.unite_prix.orderBy('ordre').toArray(),
+                 A.bd.famille_produit.orderBy('ordre').toArray()])
+      .then(function (r) {
+        contexte = r[0];
+        unites = r[1];
+        familles = r[2];
+
+        unites.forEach(function (u) { champU.appendChild(new Option(u.libelle, u.code)); });
+        if (unites.some(function (u) { return u.code === 'L'; })) champU.value = 'L';
+
+        champFam.appendChild(new Option('à choisir', ''));
+        familles.forEach(function (f) { champFam.appendChild(new Option(f.libelle, f.code)); });
+        majTypes();
+      });
+
+    champFam.addEventListener('change', majTypes);
+    function majTypes() {
+      var liste = TYPES[champFam.value] || [];
+      champType.innerHTML = '';
+      if (!liste.length) { caseType.style.display = 'none'; return; }
+      caseType.style.display = 'block';
+      champType.appendChild(new Option('à choisir', ''));
+      liste.forEach(function (t) { champType.appendChild(new Option(t, t)); });
     }
 
-    contenu.appendChild(alerte);
-
-    var boutons = element('div', 'boutons-fenetre');
-    boutons.appendChild(bouton('lien', 'Annuler', function () { fenetre.remove(); }));
-    boutons.appendChild(bouton('enregistrer', 'Ajouter', function () {
-      var donnees = { nom: nom };
-      if (table === 'produit') {
-        if (!choixFamille.value) {
-          alerte.textContent = 'Choisissez la famille du produit.';
-          alerte.style.display = 'block';
-          return;
-        }
-        donnees.famille_code = choixFamille.value;
-        donnees.unite_code = choixUnite.value || null;
-        donnees.segment = null;
-      }
-      A.enregistrerFiche(table, donnees).then(function (fiche) {
-        A.oublierIndex(table);
-        fenetre.remove();
-        surAjout(fiche);
+    // ---- propositions ----
+    function brancherPropositions(champ, liste, table, surChoix) {
+      champ.addEventListener('input', function () {
+        var texte = champ.value.trim();
+        surChoix(null);
+        if (texte.length < 2) { liste.style.display = 'none'; liste.innerHTML = ''; return; }
+        A.rechercherFiches(table, texte, 6).then(function (lignes) {
+          if (champ.value.trim() !== texte) return;
+          liste.innerHTML = '';
+          var exact = null;
+          lignes.forEach(function (l) {
+            if (A.normaliserLibelle(l.nom) === A.normaliserLibelle(texte)) exact = l;
+          });
+          if (exact) { surChoix(exact); liste.style.display = 'none'; return; }
+          if (!lignes.length) { liste.style.display = 'none'; return; }
+          liste.style.display = 'block';
+          lignes.forEach(function (l) {
+            liste.appendChild(bouton('proposition', l.nom, function () {
+              champ.value = l.nom;
+              surChoix(l);
+              liste.style.display = 'none';
+              liste.innerHTML = '';
+            }));
+          });
+        });
       });
-    }));
-    contenu.appendChild(boutons);
+    }
 
-    fenetre.appendChild(contenu);
-    global.document.body.appendChild(fenetre);
-  }
-
-  // -------------------------------------------------------------------------
-  // Écran
-  // -------------------------------------------------------------------------
-  function afficherSaisie(zone, compte) {
-    Promise.all([
-      A.bd.unite_prix.orderBy('ordre').toArray(),
-      A.bd.famille_produit.orderBy('ordre').toArray(),
-      A.nombreEnAttente()
-    ]).then(function (charge) {
-      var unites = charge[0];
-      var familles = charge[1];
-
-      zone.innerHTML = '';
-
-      var bandeau = element('header', 'bandeau');
-      bandeau.appendChild(element('h1', null, 'Relevé de prix'));
-      var attente = element('p', 'attente');
-      bandeau.appendChild(attente);
-      zone.appendChild(bandeau);
-
-      function afficherAttente(n) {
-        if (!n) { attente.style.display = 'none'; return; }
-        attente.style.display = 'block';
-        attente.textContent = n + (n > 1 ? ' relevés à renvoyer' : ' relevé à renvoyer');
-      }
-      afficherAttente(charge[2]);
-      A.surChangementFileAttente(afficherAttente);
-
-      var champFournisseur = creerChampRecherche({
-        libelle: 'Fournisseur', table: 'fournisseur', exemple: 'Nom du fournisseur',
-        surCreation: function (nom, retour) { ouvrirAjout('fournisseur', nom, unites, familles, retour); }
-      });
-      var champProduit = creerChampRecherche({
-        libelle: 'Produit', table: 'produit', exemple: 'Nom du produit',
-        surCreation: function (nom, retour) { ouvrirAjout('produit', nom, unites, familles, retour); },
-        surChangement: function () {
-          uniteChoisie = '';
-          if (listeUnites) listeUnites.value = uniteRetenue();
-          majUnite();
-        }
-      });
-
-      zone.appendChild(champFournisseur.element);
-      zone.appendChild(champProduit.element);
-
-      var champPrix = element('div', 'champ');
-      champPrix.appendChild(element('span', 'etiquette', 'Prix hors taxes, remise déduite'));
-      var lignePrix = element('div', 'ligne-prix');
-      var saisiePrix = element('input', 'saisie');
-      saisiePrix.type = 'text';
-      saisiePrix.inputMode = 'decimal';
-      saisiePrix.placeholder = '0,00';
-      var listeUnites = element('select', 'saisie choix-unite');
-      listeUnites.appendChild(new Option('unité…', ''));
-      unites.forEach(function (u) { listeUnites.appendChild(new Option(u.libelle, u.code)); });
-      listeUnites.addEventListener('change', function () { uniteChoisie = listeUnites.value; });
-      lignePrix.appendChild(saisiePrix);
-      lignePrix.appendChild(listeUnites);
-      champPrix.appendChild(lignePrix);
-      zone.appendChild(champPrix);
-
-      var uniteChoisie = '';
-      function uniteRetenue() {
-        var p = champProduit.lire();
-        return uniteChoisie || (p && p.unite_code) || '';
-      }
-      function majUnite() {
-        listeUnites.value = uniteRetenue();
-      }
-
-      var repli = element('div', 'repli');
-      repli.style.display = 'none';
-
-      var champDate = element('div', 'champ');
-      champDate.appendChild(element('span', 'etiquette', 'Date du prix'));
-      var saisieDate = element('input', 'saisie');
-      saisieDate.type = 'date';
-      saisieDate.value = aujourdhui();
-      saisieDate.max = aujourdhui();
-      champDate.appendChild(saisieDate);
-      repli.appendChild(champDate);
-
-      var champRemarque = element('div', 'champ');
-      champRemarque.appendChild(element('span', 'etiquette', 'Remarque'));
-      var saisieRemarque = element('input', 'saisie');
-      saisieRemarque.type = 'text';
-      saisieRemarque.placeholder = 'facultatif';
-      champRemarque.appendChild(saisieRemarque);
-      repli.appendChild(champRemarque);
-
-      var boutonDetails = bouton('lien details', 'Détails', function () {
-        var ouvert = repli.style.display !== 'none';
-        repli.style.display = ouvert ? 'none' : 'block';
-        boutonDetails.textContent = ouvert ? 'Détails' : 'Masquer les détails';
-      });
-      zone.appendChild(boutonDetails);
-      zone.appendChild(repli);
-
-      var alerte = element('p', 'alerte');
-      alerte.style.display = 'none';
-      var confirmation = element('p', 'confirmation');
-      confirmation.style.display = 'none';
-      zone.appendChild(alerte);
-      zone.appendChild(confirmation);
-
-      function signaler(texte) {
-        confirmation.style.display = 'none';
-        alerte.textContent = texte;
-        alerte.style.display = 'block';
-      }
-
-      var boutonEnregistrer = bouton('enregistrer', 'Enregistrer ce relevé', function () {
-        var fournisseur = champFournisseur.lire();
-        var produit = champProduit.lire();
-        if (!fournisseur) return signaler('Indiquez le fournisseur.');
-        if (!produit) return signaler('Indiquez le produit.');
-        var valeur = Number(String(saisiePrix.value).replace(',', '.'));
-        if (!isFinite(valeur) || valeur <= 0) return signaler('Indiquez un prix, remise déduite, hors taxes.');
-        if (!uniteRetenue()) return signaler('Indiquez à quoi correspond ce prix : au litre, au kilo, à la tonne.');
-        if (saisieDate.value > aujourdhui()) return signaler("La date indiquée est postérieure à aujourd'hui.");
-
-        A.enregistrerReleve({
-          date_prix: saisieDate.value,
-          fournisseur_id: fournisseur.id,
-          produit_id: produit.id,
-          prix_unitaire_ht: valeur,
-          unite_code: uniteRetenue(),
-          commentaire: saisieRemarque.value.trim() || null
-        }).then(function () {
-          alerte.style.display = 'none';
-          confirmation.textContent = "Enregistré sur votre téléphone. Sera envoyé à l'équipe dès le retour du réseau.";
-          confirmation.style.display = 'block';
-          champProduit.vider();
-          saisiePrix.value = '';
-          saisieRemarque.value = '';
-          uniteChoisie = '';
-          listeUnites.value = '';
-          majUnite();
-        }).catch(function (erreur) { signaler(A.messageSimple(erreur)); });
-      });
-      zone.appendChild(boutonEnregistrer);
-      zone.appendChild(bouton('lien', 'Revenir à l\'accueil', function () { A.naviguer('accueil'); }));
-
-      majUnite();
+    brancherPropositions(champF, listeF, 'fournisseur', function (f) {
+      fournisseurChoisi = f;
+      majRappel();
     });
+    brancherPropositions(champP, listeP, 'produit', function (p) {
+      produitChoisi = p;
+      majRappel();
+      majCreation();
+    });
+
+    function majCreation() {
+      var texte = champP.value.trim();
+      if (produitChoisi || texte.length < 3) { creation.style.display = 'none'; return; }
+      titreCreation.innerHTML = '';
+      titreCreation.appendChild(element('span', null, '« '));
+      titreCreation.appendChild(element('b', null, texte));
+      titreCreation.appendChild(element('span', null,
+        ' » n\'existe pas encore. Dites de quoi il s\'agit, une seule fois.'));
+      creation.style.display = 'block';
+    }
+
+    function majRappel() {
+      if (!produitChoisi) { rappel.style.display = 'none'; return; }
+      A.relevesRetenus().then(function (tous) {
+        var siens = tous.filter(function (x) {
+          var p = C.ficheConservee(contexte.produits, x.produit_id);
+          if (!p || p.id !== produitChoisi.id) return false;
+          if (!fournisseurChoisi) return true;
+          var f = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
+          return f && f.id === fournisseurChoisi.id;
+        }).sort(function (a, b) { return String(b.date_prix).localeCompare(String(a.date_prix)); });
+
+        rappel.innerHTML = '';
+        if (!siens.length) {
+          rappel.appendChild(element('span', null, 'Premier relevé de '));
+          rappel.appendChild(element('b', null, produitChoisi.nom));
+          if (fournisseurChoisi) {
+            rappel.appendChild(element('span', null, ' chez '));
+            rappel.appendChild(element('b', null, fournisseurChoisi.nom));
+          }
+          rappel.appendChild(element('span', null, '.'));
+        } else {
+          var d = siens[0];
+          var u = contexte.unites[d.unite_code];
+          rappel.appendChild(element('span', null, 'Dernier prix connu'));
+          if (fournisseurChoisi) {
+            rappel.appendChild(element('span', null, ' chez '));
+            rappel.appendChild(element('b', null, fournisseurChoisi.nom));
+          }
+          rappel.appendChild(element('span', null, ' : '));
+          rappel.appendChild(element('b', null,
+            C.nombreFrancais(d.prix_unitaire_ht) + ' ' + (u ? u.libelle : d.unite_code)));
+          rappel.appendChild(element('span', null, ' le ' + C.dateFrancaise(d.date_prix) + '.'));
+          if (d.unite_code) champU.value = d.unite_code;
+        }
+        rappel.style.display = 'block';
+      });
+    }
+
+    function signaler(texte) {
+      alerte.textContent = texte;
+      alerte.style.display = 'block';
+    }
+
+    // ---- ajout d'une ligne ----
+    function ajouter() {
+      alerte.style.display = 'none';
+      var nomF = champF.value.trim();
+      var nomP = champP.value.trim();
+      if (!nomF) return signaler('Indiquez le fournisseur.');
+      if (!nomP) return signaler('Indiquez le produit.');
+      var valeur = Number(String(champPrix.value).replace(',', '.'));
+      if (!isFinite(valeur) || valeur <= 0) {
+        return signaler('Indiquez un prix, remise déduite, hors taxes.');
+      }
+      if (!champU.value) return signaler('Indiquez à quoi correspond ce prix.');
+      if (!produitChoisi && !champFam.value) {
+        return signaler('Indiquez la famille de ce nouveau produit.');
+      }
+      if (!produitChoisi && (TYPES[champFam.value] || []).length && !champType.value) {
+        return signaler('Indiquez le type de ce nouveau produit.');
+      }
+
+      var attente = Promise.resolve();
+
+      if (!fournisseurChoisi) {
+        attente = attente.then(function () {
+          return A.enregistrerFiche('fournisseur', { nom: nomF }).then(function (f) {
+            fournisseurChoisi = f;
+            A.oublierIndex('fournisseur');
+          });
+        });
+      }
+      if (!produitChoisi) {
+        attente = attente.then(function () {
+          return A.enregistrerFiche('produit', {
+            nom: nomP,
+            famille_code: champFam.value,
+            segment: champType.value || null,
+            unite_code: champU.value
+          }).then(function (p) {
+            produitChoisi = p;
+            A.oublierIndex('produit');
+          });
+        });
+      }
+
+      attente.then(function () {
+        return A.enregistrerReleve({
+          date_prix: aujourdhui(),
+          fournisseur_id: fournisseurChoisi.id,
+          produit_id: produitChoisi.id,
+          prix_unitaire_ht: valeur,
+          unite_code: champU.value,
+          commentaire: null
+        });
+      }).then(function (ligne) {
+        session.unshift({
+          produit: produitChoisi.nom,
+          fournisseur: fournisseurChoisi.nom,
+          date: ligne.date_prix,
+          prix: valeur,
+          unite: champU.value
+        });
+        champP.value = '';
+        champPrix.value = '';
+        produitChoisi = null;
+        rappel.style.display = 'none';
+        creation.style.display = 'none';
+        champFam.value = '';
+        majTypes();
+        listeP.style.display = 'none';
+        champP.focus();
+        return C.chargerContexte();
+      }).then(function (ctx) {
+        contexte = ctx;
+        poserSession();
+      }).catch(function (erreur) {
+        signaler(A.messageSimple(erreur));
+      });
+    }
+
+    function poserSession() {
+      tableau.innerHTML = '';
+      titreSession.style.display = session.length ? 'block' : 'none';
+      if (!session.length) return;
+
+      var entete = element('div', 'rangee entete');
+      entete.appendChild(element('span', 'col-produit', 'Produit'));
+      var m = element('span', 'col-meta');
+      m.appendChild(element('span', 'col-fournisseur', 'Fournisseur'));
+      m.appendChild(element('span', 'col-date', 'Date'));
+      entete.appendChild(m);
+      entete.appendChild(element('span', 'col-prix', 'Prix'));
+      entete.appendChild(element('span', 'col-evolution', 'État'));
+      tableau.appendChild(entete);
+
+      session.forEach(function (x) {
+        var u = contexte.unites[x.unite];
+        var ligne = element('div', 'rangee');
+        ligne.appendChild(element('span', 'col-produit', x.produit));
+        var mm = element('span', 'col-meta');
+        mm.appendChild(element('span', 'col-fournisseur', x.fournisseur));
+        mm.appendChild(element('span', 'col-date', C.dateFrancaise(x.date)));
+        ligne.appendChild(mm);
+        var prix = element('span', 'col-prix');
+        prix.appendChild(element('span', null, C.nombreFrancais(x.prix)));
+        prix.appendChild(element('span', 'unite-discrete', ' ' + (u ? u.libelle : x.unite)));
+        ligne.appendChild(prix);
+        ligne.appendChild(element('span', 'col-evolution neutre', 'enregistré'));
+        tableau.appendChild(ligne);
+      });
+    }
   }
 
   A.afficherSaisie = afficherSaisie;

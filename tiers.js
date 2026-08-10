@@ -22,7 +22,7 @@
     }
   };
 
-  function afficherListeFournisseurs(zone, compte) {
+  function afficherListeFournisseurs(zone, compte, surChoix, choisi) {
     var C = A.calculs;
     var element = C.element;
     var bouton = C.bouton;
@@ -31,23 +31,30 @@
     var recherche = element('div', 'recherche');
     var champ = element('input', 'champ-recherche');
     champ.type = 'search';
-    champ.placeholder = 'Chercher un fournisseur…';
+    champ.placeholder = 'Chercher un fournisseur';
     recherche.appendChild(champ);
     zone.appendChild(recherche);
 
-    var liste = element('div');
+    var compteur = element('p', 'surtitre');
+    zone.appendChild(compteur);
+
+    var liste = element('div', 'liste-panneau');
     liste.appendChild(element('p', 'appui', 'Lecture…'));
     zone.appendChild(liste);
 
     Promise.all([C.chargerContexte(), A.relevesRetenus(), A.bd.fournisseur.toArray()])
       .then(function (r) {
         var contexte = r[0];
-        var compte_releves = {};
+        var nombre = {};
+        var produits = {};
         var dernier = {};
         r[1].forEach(function (x) {
           var f = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
           if (!f) return;
-          compte_releves[f.id] = (compte_releves[f.id] || 0) + 1;
+          nombre[f.id] = (nombre[f.id] || 0) + 1;
+          if (!produits[f.id]) produits[f.id] = {};
+          var p = C.ficheConservee(contexte.produits, x.produit_id);
+          if (p) produits[f.id][p.id] = true;
           if (!dernier[f.id] || String(x.date_prix) > String(dernier[f.id])) dernier[f.id] = x.date_prix;
         });
 
@@ -60,32 +67,32 @@
             return A.normaliserLibelle(f.nom).indexOf(A.normaliserLibelle(filtre)) >= 0;
           });
           visibles.sort(function (a, b) {
-            var ca = compte_releves[a.id] || 0, cb = compte_releves[b.id] || 0;
+            var ca = nombre[a.id] || 0, cb = nombre[b.id] || 0;
             if (ca !== cb) return cb - ca;
             return a.nom.localeCompare(b.nom, 'fr');
           });
+          compteur.textContent = visibles.length +
+            (visibles.length > 1 ? ' fournisseurs' : ' fournisseur');
 
           if (!visibles.length) {
-            liste.appendChild(element('p', 'vide',
-              fiches.length ? 'Aucun fournisseur sous ce nom.'
-                            : 'Aucun fournisseur pour l\'instant. Ils se créent à la saisie d\'un prix.'));
+            liste.appendChild(element('p', 'vide', fiches.length
+              ? 'Rien de connu sous ce nom.'
+              : 'Aucun fournisseur pour l\'instant. Ils se créent à la saisie d\'un prix.'));
             return;
           }
 
           visibles.forEach(function (f) {
-            var n = compte_releves[f.id] || 0;
-            var c = bouton('carte', '', function () { A.naviguer('fournisseur', { fiche: f }); });
-            var haut = element('div', 'carte-haut');
-            haut.appendChild(element('span', 'carte-titre', f.nom));
-            haut.appendChild(element('span', 'carte-compte', String(n)));
-            c.appendChild(haut);
-            var bas = element('div', 'carte-bas');
-            bas.appendChild(element('span', 'carte-fournisseur',
-              n ? (n > 1 ? n + ' relevés' : '1 relevé') : 'aucun relevé'));
-            if (dernier[f.id]) bas.appendChild(element('span', 'carte-date',
-              'dernier : ' + C.dateFrancaise(dernier[f.id])));
-            c.appendChild(bas);
-            liste.appendChild(c);
+            var n = nombre[f.id] || 0;
+            var nbProduits = produits[f.id] ? Object.keys(produits[f.id]).length : 0;
+            var b = bouton(choisi && choisi.id === f.id ? 'ligne-panneau actif' : 'ligne-panneau', '',
+              function () { surChoix(f); });
+            b.appendChild(element('span', 'ligne-panneau-nom', f.nom));
+            b.appendChild(element('span', 'ligne-panneau-appui', n
+              ? nbProduits + (nbProduits > 1 ? ' produits · ' : ' produit · ') +
+                n + (n > 1 ? ' relevés' : ' relevé') +
+                ' · dernier le ' + C.dateFrancaise(dernier[f.id])
+              : 'aucun relevé'));
+            liste.appendChild(b);
           });
         }
 
@@ -125,7 +132,8 @@
         });
 
         detail.innerHTML = '';
-        var entete = element('div', 'entete-produit');
+        var entete = element('div', 'entete-fiche');
+        entete.appendChild(element('p', 'surtitre', 'Fournisseur'));
         entete.appendChild(element('h2', null, fiche.nom));
         detail.appendChild(entete);
 
@@ -142,7 +150,7 @@
           if (a) autres[a.nom] = true;
           if (!datePlusAncienne || r.date_prix < datePlusAncienne) datePlusAncienne = r.date_prix;
         });
-        entete.appendChild(element('p', 'appui',
+        entete.appendChild(element('p', 'sous-titre',
           siens.length + (siens.length > 1 ? ' relevés' : ' relevé') +
           ' depuis le ' + C.dateFrancaise(datePlusAncienne)));
         entete.appendChild(element('p', 'appui',

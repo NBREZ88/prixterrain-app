@@ -326,111 +326,266 @@
     var contexte = null;
     var reglages = null;
 
-    var detail = element('div');
     zone.innerHTML = '';
-    zone.appendChild(detail);
-    detail.appendChild(element('p', 'appui', 'Lecture des relevés…'));
+    zone.className = 'ecran-fiche';
+    zone.appendChild(element('p', 'appui', 'Lecture des relevés…'));
 
     Promise.all([chargerContexte(), chargerReglages()]).then(function (r) {
       contexte = r[0];
       reglages = r[1];
-      afficherProduit(produit);
+      relevesDuProduit(produit.id, contexte).then(dessiner);
     });
 
-    function afficherProduit(produit) {
-      detail.innerHTML = '';
-      detail.appendChild(element('p', null, 'Lecture des relevés…'));
+    function dessiner(releves) {
+      zone.innerHTML = '';
+      var dates = releves.map(function (x) { return x.date_prix; }).sort();
+      var res = releves.length
+        ? calculerAgregats(releves, contexte, reglages, produit.famille_code)
+        : { lignes: [], retenus: [], medianes: {}, seuilAtypique: null };
 
-      relevesDuProduit(produit.id, contexte).then(function (releves) {
-        detail.innerHTML = '';
+      // --- en-tête ---
+      var famille = contexte.familles[produit.famille_code];
+      var entete = element('div', 'entete-fiche');
+      entete.appendChild(element('p', 'surtitre',
+        (famille ? famille.libelle : produit.famille_code) +
+        (produit.segment ? ' · ' + produit.segment : '')));
+      entete.appendChild(element('h2', null, produit.nom));
+      entete.appendChild(element('p', 'sous-titre', releves.length
+        ? 'Dernier relevé le ' + dateFrancaise(dates[dates.length - 1])
+        : 'Aucun relevé'));
+      zone.appendChild(entete);
 
-        var famille = contexte.familles[produit.famille_code];
-        var entete = element('div', 'entete-produit');
-        entete.appendChild(element('h2', null, produit.nom));
-        entete.appendChild(element('p', 'appui',
-          (famille ? famille.libelle : produit.famille_code) +
-          (produit.segment ? ' — ' + produit.segment : '')));
-        detail.appendChild(entete);
-
-        if (!releves.length) {
-          detail.appendChild(element('p', 'confirmation',
-            'Aucun relevé pour ce produit. Il figure au catalogue, son prix n\'a pas encore été relevé.'));
-          return;
+      // --- moyenne globale et meilleur prix récent ---
+      var compteUnite = {}, uniteDominante = null;
+      res.retenus.forEach(function (x) {
+        compteUnite[x.unite_code] = (compteUnite[x.unite_code] || 0) + 1;
+        if (!uniteDominante || compteUnite[x.unite_code] > compteUnite[uniteDominante]) {
+          uniteDominante = x.unite_code;
         }
-
-        var resultat = calculerAgregats(releves, contexte, reglages, produit.famille_code);
-
-        if (resultat.validiteAbsente) {
-          detail.appendChild(encartReglageManquant(reglages, 'duree_validite', produit.famille_code));
-        }
-        if (resultat.minimumAbsent) {
-          detail.appendChild(encartReglageManquant(reglages, 'nombre_minimal_releves', ''));
-        }
-        if (reglages.valeur('anciennete_exclusion', produit.famille_code) === null) {
-          detail.appendChild(encartReglageManquant(reglages, 'anciennete_exclusion', produit.famille_code));
-        }
-        if (resultat.decote === null) {
-          detail.appendChild(encartReglageManquant(reglages, 'decote_mensuelle', ''));
-        }
-        if (resultat.seuilAtypique === null) {
-          detail.appendChild(encartReglageManquant(reglages, 'ecart_atypique', ''));
-        }
-
-        resultat.lignes.forEach(function (ligne) {
-          detail.appendChild(carteGroupe(ligne, resultat, contexte, 'profils', 'saisi_par'));
-        });
-
-        var unitesVues = {};
-        resultat.retenus.forEach(function (r) { unitesVues[r.unite_code] = true; });
-        Object.keys(unitesVues).forEach(function (code) {
-          var unite = contexte.unites[code] || { code: code, libelle: code };
-          var bloc = courbe(resultat.retenus, contexte, unite);
-          if (bloc) detail.appendChild(bloc);
-        });
       });
-    }
+      var duBloc = res.retenus.filter(function (x) { return x.unite_code === uniteDominante; });
+      var minimum = reglages.valeur('nombre_minimal_releves', '');
+      var decote = reglages.valeur('decote_mensuelle', '');
+      var aujourdhui = new Date();
 
-    function carteGroupe(ligne, resultat, contexte, tableTiers, colonneTiers) {
-      var carte = element('div', 'groupe');
-      if (ligne.nomGroupe) carte.appendChild(element('p', 'titre-bloc', ligne.nomGroupe));
-
-      if (ligne.calculable) {
-        carte.appendChild(element('p', 'valeur-moyenne',
-          nombreFrancais(ligne.moyenne) + ' ' + ligne.unite.libelle +
-          ' — moyenne ' + (ligne.pondere ? 'pondérée' : 'non pondérée') +
-          ' de ' + ligne.nombre + (ligne.nombre > 1 ? ' relevés' : ' relevé') +
-          ' — plus ancien : ' + dateFrancaise(ligne.plusAncien)));
-      } else {
-        carte.appendChild(element('p', 'valeur-absente',
-          'Moyenne non calculable en ' + ligne.unite.libelle + ' — ' +
-          ligne.nombre + (ligne.nombre > 1 ? ' relevés' : ' relevé') +
-          ' — plus ancien : ' + dateFrancaise(ligne.plusAncien)));
+      var globale = null, plusAncienGlobal = null;
+      if (minimum !== null && duBloc.length >= minimum) {
+        var sp = 0, sv = 0;
+        duBloc.forEach(function (x) {
+          var poids = decote === null ? 1 : Math.pow(1 - decote, ageEnMois(x.date_prix, aujourdhui));
+          sp += poids;
+          sv += Number(x.prix_unitaire_ht) * poids;
+        });
+        if (sp > 0) {
+          globale = sv / sp;
+          plusAncienGlobal = duBloc.map(function (x) { return x.date_prix; }).sort()[0];
+        }
       }
 
-      var liste = element('ul', 'liste-releves');
-      ligne.releves.forEach(function (r) {
-        var tiers = ficheConservee(contexte[tableTiers], r[colonneTiers]);
-        var texte = dateFrancaise(r.date_prix) + ' — ' +
-                    nombreFrancais(r.prix_unitaire_ht) + ' ' + ligne.unite.libelle +
-                    ' — relevé par ' + (tiers ? tiers.nom : 'compte non retrouvé');
-        var item = element('li', null, texte);
-
-        if (ligne.calculable && resultat.seuilAtypique !== null) {
-          var med = resultat.medianes[ligne.unite.code];
-          if (med) {
-            var ecart = Math.abs(Number(r.prix_unitaire_ht) - med) / med * 100;
-            if (ecart > resultat.seuilAtypique) {
-              item.className = 'atypique';
-              item.appendChild(element('span', 'marque',
-                ' à vérifier : ' + nombreFrancais(ecart, 0) + ' % d\'écart au prix médian'));
-            }
-          }
-        }
-        if (r.commentaire) item.appendChild(element('span', 'appui', r.commentaire));
-        liste.appendChild(item);
+      var derniers = {}, meilleur = null;
+      duBloc.forEach(function (x) {
+        var f = ficheConservee(contexte.fournisseurs, x.fournisseur_id);
+        var idf = f ? f.id : 'inconnu';
+        if (!derniers[idf] || x.date_prix > derniers[idf].date_prix) derniers[idf] = x;
       });
-      carte.appendChild(liste);
-      return carte;
+      Object.keys(derniers).forEach(function (idf) {
+        if (!meilleur || Number(derniers[idf].prix_unitaire_ht) < Number(meilleur.prix_unitaire_ht)) {
+          meilleur = derniers[idf];
+        }
+      });
+
+      var bloc = element('div', globale !== null ? 'chiffre-principal' : 'chiffre-principal absent');
+      bloc.appendChild(element('p', 'cp-question', 'Ce produit coûte en moyenne'));
+      if (globale !== null) {
+        var u = contexte.unites[uniteDominante];
+        var v = element('p', 'cp-valeur');
+        v.appendChild(element('span', null, nombreFrancais(globale)));
+        v.appendChild(element('span', 'cp-unite', ' ' + (u ? u.libelle : uniteDominante)));
+        bloc.appendChild(v);
+        var pastilles = element('div', 'cp-pastilles');
+        [duBloc.length + ' relevés',
+         'depuis ' + dateFrancaise(plusAncienGlobal),
+         decote === null ? 'non pondérée' : 'pondérée'].forEach(function (t) {
+          pastilles.appendChild(element('span', 'cp-pastille', t));
+        });
+        bloc.appendChild(pastilles);
+      } else {
+        bloc.appendChild(element('p', 'cp-valeur-absente', releves.length
+          ? 'Pas encore assez de relevés' : 'Aucun relevé pour ce produit'));
+        bloc.appendChild(element('p', 'cp-appui', releves.length
+          ? (minimum === null
+             ? 'Le nombre minimal de relevés n\'est pas renseigné dans les Réglages.'
+             : duBloc.length + ' relevés retenus, il en faut ' + minimum + '.')
+          : 'Il figure au catalogue, son prix n\'a pas encore été relevé.'));
+      }
+      if (meilleur) {
+        var f2 = ficheConservee(contexte.fournisseurs, meilleur.fournisseur_id);
+        var um = contexte.unites[meilleur.unite_code];
+        var ligne = element('p', 'cp-meilleur');
+        ligne.appendChild(element('span', 'cp-meilleur-etq', 'Le moins cher récemment '));
+        ligne.appendChild(element('b', null,
+          nombreFrancais(meilleur.prix_unitaire_ht) + ' ' + (um ? um.libelle : meilleur.unite_code)));
+        ligne.appendChild(element('span', null,
+          ' chez ' + (f2 ? f2.nom : 'fournisseur non retrouvé') +
+          ', le ' + dateFrancaise(meilleur.date_prix)));
+        bloc.appendChild(ligne);
+      }
+      zone.appendChild(bloc);
+
+      // --- réglages manquants ---
+      [['duree_validite', produit.famille_code], ['anciennete_exclusion', produit.famille_code],
+       ['nombre_minimal_releves', ''], ['decote_mensuelle', ''], ['ecart_atypique', '']]
+        .forEach(function (paire) {
+          if (reglages.valeur(paire[0], paire[1]) === null) {
+            zone.appendChild(encartReglageManquant(reglages, paire[0], paire[1]));
+          }
+        });
+
+      // --- onglets ---
+      var ongletCourant = 'comparaison';
+      var onglets = element('div', 'onglets-fiche');
+      var contenu = element('div');
+      zone.appendChild(onglets);
+      zone.appendChild(contenu);
+      A.suivreHauteur(contenu);
+
+      function poserOnglets() {
+        onglets.innerHTML = '';
+        [['comparaison', 'Comparaison'], ['releves', 'Relevés']].forEach(function (o) {
+          onglets.appendChild(bouton(ongletCourant === o[0] ? 'on' : '', o[1], function () {
+            ongletCourant = o[0];
+            poserOnglets();
+            poserContenu();
+          }));
+        });
+      }
+
+      function poserContenu() {
+        contenu.innerHTML = '';
+        if (ongletCourant === 'comparaison') poserComparaison();
+        else poserReleves();
+        A.ajusterHauteurs();
+      }
+
+      function poserComparaison() {
+        if (!res.lignes.length) {
+          contenu.appendChild(element('p', 'vide', 'Aucun relevé pour ce produit.'));
+          return;
+        }
+        var moinsCher = null;
+        res.lignes.forEach(function (l) {
+          if (l.calculable && (moinsCher === null || l.moyenne < moinsCher)) moinsCher = l.moyenne;
+        });
+
+        var tableau = element('div', 'tableau-prix');
+        var entete = element('div', 'rangee entete');
+        entete.appendChild(element('span', 'col-produit', 'Fournisseur'));
+        var m = element('span', 'col-meta');
+        m.appendChild(element('span', 'col-fournisseur', 'Relevés'));
+        m.appendChild(element('span', 'col-date', 'Plus ancien'));
+        entete.appendChild(m);
+        entete.appendChild(element('span', 'col-prix', 'Prix moyen'));
+        entete.appendChild(element('span', 'col-evolution', 'Écart'));
+        tableau.appendChild(entete);
+
+        res.lignes.slice().sort(function (a, b) {
+          if (a.calculable !== b.calculable) return a.calculable ? -1 : 1;
+          return (a.moyenne || 0) - (b.moyenne || 0);
+        }).forEach(function (l) {
+          var ligne = element('div', 'rangee');
+          ligne.appendChild(element('span', 'col-produit', l.nomGroupe));
+          var meta = element('span', 'col-meta');
+          meta.appendChild(element('span', 'col-fournisseur',
+            l.nombre + (l.nombre > 1 ? ' relevés' : ' relevé')));
+          meta.appendChild(element('span', 'col-date', dateFrancaise(l.plusAncien)));
+          ligne.appendChild(meta);
+
+          var prix = element('span', 'col-prix');
+          if (l.calculable) {
+            prix.appendChild(element('span', null, nombreFrancais(l.moyenne)));
+            prix.appendChild(element('span', 'unite-discrete', ' ' + l.unite.libelle));
+          } else {
+            prix.appendChild(element('span', 'unite-discrete', 'non calculable'));
+          }
+          ligne.appendChild(prix);
+
+          if (!l.calculable) {
+            ligne.className = 'rangee attention';
+            ligne.appendChild(element('span', 'col-evolution neutre',
+              minimum === null ? 'minimum non réglé' : 'minimum ' + minimum));
+          } else if (l.moyenne === moinsCher) {
+            ligne.className = 'rangee mieux';
+            ligne.appendChild(element('span', 'col-evolution baisse', '▼ le moins cher'));
+          } else {
+            ligne.appendChild(element('span', 'col-evolution hausse',
+              '▲ +' + nombreFrancais((l.moyenne - moinsCher) / moinsCher * 100, 1) + ' %'));
+          }
+          tableau.appendChild(ligne);
+        });
+        contenu.appendChild(tableau);
+      }
+
+      function poserReleves() {
+        if (!releves.length) { contenu.appendChild(element('p', 'vide', 'Aucun relevé.')); return; }
+
+        var tableau = element('div', 'tableau-prix');
+        var entete = element('div', 'rangee entete');
+        entete.appendChild(element('span', 'col-produit', 'Fournisseur'));
+        var m = element('span', 'col-meta');
+        m.appendChild(element('span', 'col-fournisseur', 'Relevé par'));
+        m.appendChild(element('span', 'col-date', 'Date'));
+        entete.appendChild(m);
+        entete.appendChild(element('span', 'col-prix', 'Prix'));
+        entete.appendChild(element('span', 'col-evolution', 'Écart au médian'));
+        tableau.appendChild(entete);
+
+        var toutes = [];
+        res.lignes.forEach(function (l) {
+          l.releves.forEach(function (x) { toutes.push({ ligne: l, releve: x }); });
+        });
+        toutes.sort(function (a, b) {
+          return String(b.releve.date_prix).localeCompare(String(a.releve.date_prix));
+        });
+
+        toutes.forEach(function (o) {
+          var x = o.releve;
+          var med = res.medianes[x.unite_code];
+          var ecart = med ? (Number(x.prix_unitaire_ht) - med) / med * 100 : null;
+          var atypique = o.ligne.calculable && med && res.seuilAtypique !== null &&
+                         Math.abs(ecart) > res.seuilAtypique;
+          var auteur = contexte.profils[x.saisi_par];
+          var u = contexte.unites[x.unite_code];
+
+          var ligne = element('div', atypique ? 'rangee attention' : 'rangee');
+          ligne.appendChild(element('span', 'col-produit', o.ligne.nomGroupe));
+          var meta = element('span', 'col-meta');
+          meta.appendChild(element('span', 'col-fournisseur', auteur ? auteur.nom : ''));
+          meta.appendChild(element('span', 'col-date', dateFrancaise(x.date_prix)));
+          ligne.appendChild(meta);
+
+          var prix = element('span', 'col-prix');
+          prix.appendChild(element('span', null, nombreFrancais(x.prix_unitaire_ht)));
+          prix.appendChild(element('span', 'unite-discrete', ' ' + (u ? u.libelle : x.unite_code)));
+          ligne.appendChild(prix);
+
+          if (ecart === null) {
+            ligne.appendChild(element('span', 'col-evolution neutre', '—'));
+          } else if (atypique) {
+            ligne.appendChild(element('span', 'col-evolution hausse',
+              '⚠ ' + (ecart > 0 ? '+' : '') + nombreFrancais(ecart, 1) + ' %'));
+          } else {
+            var sens = ecart > 0.05 ? 'hausse' : (ecart < -0.05 ? 'baisse' : 'neutre');
+            var fleche = sens === 'hausse' ? '▲ ' : (sens === 'baisse' ? '▼ ' : '= ');
+            ligne.appendChild(element('span', 'col-evolution ' + sens,
+              fleche + (ecart > 0 ? '+' : '') + nombreFrancais(ecart, 1) + ' %'));
+          }
+          tableau.appendChild(ligne);
+        });
+        contenu.appendChild(tableau);
+      }
+
+      poserOnglets();
+      poserContenu();
     }
   }
 

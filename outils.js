@@ -197,8 +197,6 @@
           entrees.push(['activite', 'Activité de l\'équipe',
             'Nombre de relevés par conseiller et par mois.', null]);
         }
-        entrees.push(['vider', 'Vider les données de cet appareil',
-          'Repartir d\'une copie neuve depuis l\'équipe.', null]);
 
         entrees.forEach(function (e) {
           if (e[4] === 'ordinateur' && window.innerWidth < 900) return;

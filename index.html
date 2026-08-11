@@ -910,6 +910,60 @@
     .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
     .ecran-fiche .tableau-prix .rangee.perime { background: var(--panneau); }
   }
+
+  /* ---- écran Compte ---- */
+  #application.ecran-compte { display: flex; flex-direction: column; overflow: hidden;
+                              min-height: 0; }
+  #application.ecran-compte > .identite,
+  #application.ecran-compte > .sel-onglets { flex: 0 0 auto; }
+  .identite { display: flex; align-items: center; gap: .9rem; background: var(--vert-clair);
+    border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1rem; }
+  .jeton { width: 2.8rem; height: 2.8rem; border-radius: 50%; background: var(--vert);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem; font-weight: 700; flex: 0 0 auto; }
+  .id-nom { display: block; font-size: 1.05rem; font-weight: 700; color: #1f4d38; }
+  .id-appui { display: block; font-size: .85rem; color: #3d6b55; margin-top: .1rem;
+              overflow: hidden; text-overflow: ellipsis; }
+  .role { display: inline-block; background: #fff; border: 1px solid #c3ddd0; color: var(--vert);
+    border-radius: 1rem; padding: .05rem .55rem; font-size: .75rem; font-weight: 700;
+    margin-left: .4rem; }
+  .encadre-compte { border: 1px solid var(--trait); border-radius: 10px; padding: .2rem .9rem; }
+  .ligne-compte { display: flex; justify-content: space-between; align-items: center;
+    gap: 1rem; padding: .65rem 0; border-top: 1px solid var(--trait); font-size: .92rem; }
+  .ligne-compte:first-child { border-top: 0; }
+  .ligne-compte span { color: var(--gris); }
+  .ligne-compte b { font-weight: 600; }
+  .ligne-compte b.en-retard { color: var(--terre); }
+  .action-compte { width: 100%; background: var(--vert); color: #fff; border: 0;
+    border-radius: 8px; padding: .75rem; font-size: .98rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-top: .7rem; }
+  .action-compte.clair { background: var(--carte); border: 1px solid var(--trait);
+                         color: var(--encre); font-weight: 500; }
+  .action-compte.clair:hover { background: var(--panneau); }
+  .membre { display: flex; align-items: center; gap: .8rem; padding: .7rem 0;
+            border-top: 1px solid var(--trait); }
+  .membre:first-child { border-top: 0; }
+  .membre.suspendu { opacity: .55; }
+  .m-jeton { width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--panneau);
+    border: 1px solid var(--trait); color: var(--gris); display: flex; align-items: center;
+    justify-content: center; font-size: .82rem; font-weight: 700; flex: 0 0 auto; }
+  .m-textes { display: block; min-width: 0; }
+  .m-nom { display: block; font-weight: 600; font-size: .96rem; }
+  .m-appui { display: block; font-size: .81rem; color: var(--gris); margin-top: .05rem;
+             overflow: hidden; text-overflow: ellipsis; }
+  .m-actions { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap;
+               justify-content: flex-end; }
+  .mini-bouton.rouge { color: var(--rouge); border-color: #e8c4bb; }
+  .etat-membre { display: inline-block; border-radius: 1rem; padding: .05rem .5rem;
+    font-size: .72rem; font-weight: 700; margin-left: .4rem;
+    background: var(--terre-clair); color: var(--terre); }
+  .aide-installation { background: var(--panneau); border-left: 3px solid var(--trait);
+    border-radius: 0 8px 8px 0; padding: .7rem .85rem; }
+  .ligne-aide { margin: 0; font-size: .85rem; color: var(--gris); line-height: 1.6; }
+  .ligne-aide + .ligne-aide { margin-top: .35rem; }
+  .ligne-aide b { color: var(--encre); }
+  .ligne-aide.vôtre { border-left: 3px solid var(--vert); padding-left: .6rem;
+                      margin-left: -.85rem; }
 </style>
 </head>
 <body>

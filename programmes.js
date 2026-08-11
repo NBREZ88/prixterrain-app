@@ -151,12 +151,14 @@
       zone.appendChild(fraicheur);
 
       if (programmes.length >= SEUIL_RECHERCHE) {
+        var recherche = element('div', 'recherche');
+        recherche.style.marginBottom = '.9rem';
         var champ = element('input', 'champ-recherche');
         champ.type = 'search';
         champ.placeholder = 'Chercher un programme, un passage ou un produit';
-        champ.style.marginBottom = '.9rem';
         champ.addEventListener('input', function () { filtre = champ.value.trim(); poser(); });
-        zone.appendChild(champ);
+        recherche.appendChild(champ);
+        zone.appendChild(recherche);
       }
 
       zone.appendChild(bouton('ajouter-programme', '+ Nouveau programme', function () {

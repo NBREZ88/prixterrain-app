@@ -72,6 +72,7 @@
     -webkit-appearance: none;
   }
   .champ-recherche:focus { outline: 2px solid var(--vert-vif); outline-offset: 1px; }
+  .champ-recherche::-webkit-search-cancel-button { -webkit-appearance: none; }
   .resultats {
     margin-top: .4rem; background: var(--carte);
     border: 1px solid var(--trait); border-radius: .75rem; overflow: hidden;
@@ -332,7 +333,9 @@
   .sel-onglets {
     display: flex; gap: 1.5rem; border-bottom: 1px solid var(--trait);
     margin-bottom: 1rem; overflow-x: auto;
+    scrollbar-width: none; -ms-overflow-style: none;
   }
+  .sel-onglets::-webkit-scrollbar { display: none; }
   .sel-onglets button {
     background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
     padding: .5rem 0 .6rem; font-size: .95rem; color: var(--gris); cursor: pointer;
@@ -419,7 +422,8 @@
   /* ---- Ordinateur : le menu passe à gauche, le contenu s'étale ---- */
   @media (min-width: 900px) {
     #entete {
-      padding-left: calc(15rem + 1.5rem); padding-right: 1.5rem;
+      padding-left: calc(clamp(10.5rem, 15vw, 15rem) + clamp(1rem, 2vw, 1.8rem));
+      padding-right: clamp(1rem, 2vw, 1.8rem);
       padding-top: 1rem; padding-bottom: 1rem;
     }
     #entete h1 { font-size: 1.25rem; }
@@ -475,7 +479,7 @@
                           text-transform: uppercase; color: var(--encre); }
 
     #barre {
-      top: 0; bottom: 0; right: auto; width: 15rem;
+      top: 0; bottom: 0; right: auto; width: clamp(10.5rem, 15vw, 15rem);
       flex-direction: column; align-items: stretch; justify-content: flex-start;
       gap: .15rem; padding: 1rem .6rem;
       border-top: 0; border-right: 1px solid var(--trait); background: var(--rail);
@@ -492,8 +496,8 @@
     #barre .onglet-bas.actif { background: var(--vert-clair); }
 
     #application {
-      margin-left: 15rem; max-width: 64rem;
-      padding: 1.5rem 1.5rem 3rem;
+      margin-left: clamp(10.5rem, 15vw, 15rem); max-width: none;
+      padding: 1.5rem clamp(1rem, 2vw, 1.8rem) 3rem;
     }
 
     .grille { grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: .7rem; }
@@ -520,7 +524,7 @@
 
   /* ---- Grand écran : trois colonnes de cartes ---- */
   @media (min-width: 1400px) {
-    #application { max-width: 78rem; }
+
     .grille { grid-template-columns: repeat(auto-fill, minmax(23rem, 1fr)); }
   }
 

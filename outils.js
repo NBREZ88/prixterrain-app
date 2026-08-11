@@ -375,12 +375,14 @@
     var explication = element('p', 'appui', 'Lecture…');
     zone.appendChild(explication);
 
+    var recherche = element('div', 'recherche');
     var champ = element('input', 'champ-recherche');
     champ.type = 'search';
     champ.placeholder = 'Chercher un produit ou un fournisseur';
-    champ.style.marginBottom = '.9rem';
     champ.addEventListener('input', function () { filtre = champ.value.trim(); poser(); });
-    zone.appendChild(champ);
+    recherche.appendChild(champ);
+    recherche.style.marginBottom = '.9rem';
+    zone.appendChild(recherche);
 
     var liste = element('div');
     zone.appendChild(liste);

@@ -3,7 +3,7 @@
 // À chaque lot livré, changer le numéro de VERSION ci-dessous : c'est ce qui
 // déclenche le remplacement de la copie sur les appareils des conseillers.
 
-var VERSION = 'prixterrain-24';
+var VERSION = 'prixterrain-25';
 
 var FICHIERS = [
   './',
@@ -17,6 +17,7 @@ var FICHIERS = [
   './reglages.js',
   './export.js',
   './comptes.js',
+  './outils.js',
   './dexie.min.js',
   './supabase.js',
   './manifeste.json',
@@ -44,8 +45,6 @@ self.addEventListener('activate', function (evenement) {
   );
 });
 
-// La bibliothèque tableur est lourde et ne sert qu'à l'export, sur ordinateur.
-// Elle n'est pas préchargée ; une fois demandée, elle est gardée.
 self.addEventListener('fetch', function (evenement) {
   var demande = evenement.request;
 

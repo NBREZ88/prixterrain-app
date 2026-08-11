@@ -444,6 +444,8 @@
     .ecran-fiche .tableau-prix .rangee .col-prix { font-size: inherit; font-weight: inherit; }
     .ecran-fiche .tableau-prix .rangee.mieux { background: var(--vert-clair); }
     .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
+    .etat-appareil { grid-template-columns: repeat(4, 1fr); }
+    .chiffres-activite { grid-template-columns: repeat(4, 1fr); }
     .rangee.entete {
       display: grid; cursor: default; border-top: 0; border-bottom: 1px solid var(--trait);
       background: var(--vert-clair); border-radius: 8px 8px 0 0; padding: .7rem .5rem;
@@ -501,6 +503,138 @@
     #application { max-width: 78rem; }
     .grille { grid-template-columns: repeat(auto-fill, minmax(23rem, 1fr)); }
   }
+
+  /* ---- Outils ---- */
+  .carte-outil { display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--carte); border: 1px solid var(--trait); border-radius: 10px;
+    padding: .8rem .95rem; margin-bottom: .55rem; font-family: inherit; }
+  .carte-outil:hover { background: var(--panneau); }
+  .co-haut { display: flex; justify-content: space-between; align-items: center; gap: .7rem; }
+  .co-titre { font-size: 1rem; font-weight: 600; color: var(--encre); }
+  .co-appui { display: block; font-size: .85rem; color: var(--gris); margin-top: .15rem; }
+  .co-fleche { color: var(--gris); font-size: 1.1rem; }
+  .co-compteur { background: var(--terre-clair); border: 1px solid #ead9bd; color: var(--terre);
+    border-radius: 1rem; padding: .08rem .6rem; font-size: .78rem; font-weight: 700;
+    white-space: nowrap; }
+
+  /* ---- fenetre ---- */
+  .voile { position: fixed; inset: 0; background: rgba(22,24,26,.5); z-index: 40;
+           display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .boite { background: #fff; border-radius: 14px; width: 100%; max-width: 27rem;
+           max-height: calc(100% - 2rem); display: flex; flex-direction: column;
+           overflow: hidden; box-shadow: 0 14px 36px rgba(0,0,0,.25); }
+  .boite-tete { display: flex; align-items: flex-start; gap: .8rem;
+                padding: .85rem 1.05rem .6rem; border-bottom: 1px solid var(--trait); }
+  .boite-titre { margin: 0; font-size: 1.06rem; font-weight: 700; }
+  .boite-titre.danger { color: var(--rouge); }
+  .boite-sous { margin: .15rem 0 0; font-size: .83rem; color: var(--gris); }
+  .boite-fermer { margin-left: auto; background: none; border: 0; color: var(--gris);
+                  font-size: 1rem; line-height: 1; cursor: pointer; font-family: inherit;
+                  padding: .2rem .3rem; border-radius: 6px; }
+  .boite-fermer:hover { background: var(--panneau); color: var(--encre); }
+  .boite-corps { padding: .85rem 1.05rem; overflow-y: auto; min-height: 0; }
+  .boite-appui { margin: .3rem 0 0; font-size: .9rem; color: var(--gris); line-height: 1.5; }
+  .boite-appui.perte { color: var(--terre); margin-top: .5rem; }
+  .champ-fenetre { margin-bottom: .65rem; }
+  .champ-fenetre .lab { display: block; font-size: .78rem; font-weight: 600; margin-bottom: .22rem; }
+  .champ-fenetre .ch { width: 100%; height: 2.6rem; font-size: .96rem; padding: 0 .7rem;
+                       border: 1px solid var(--trait); border-radius: 8px; font-family: inherit; }
+  .champ-fenetre .ch.modifie { border-color: var(--vert); background: var(--vert-clair);
+                               font-weight: 600; }
+  .avant { margin: .18rem 0 0; font-size: .77rem; color: var(--gris); }
+  .avant b { color: var(--rouge); text-decoration: line-through; font-weight: 600; }
+  .ligne-fenetre { display: flex; gap: .5rem; }
+  .ligne-fenetre .champ-fenetre { flex: 1; }
+  .ligne-fenetre .court { flex: 0 0 7.5rem; }
+  .note { background: var(--panneau); border: 1px solid var(--trait); border-radius: 8px;
+          padding: .55rem .7rem; font-size: .8rem; color: var(--gris); line-height: 1.45;
+          margin: .3rem 0 0; }
+  .boite-pied { padding: .8rem 1.05rem 1rem; border-top: 1px solid var(--trait);
+                display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+  .principal { background: var(--vert); color: #fff; border: 0; border-radius: 8px;
+               padding: .8rem 1.1rem; font-size: 1rem; font-weight: 600; cursor: pointer;
+               font-family: inherit; }
+  .principal.pleine { width: 100%; }
+  .lien-danger { background: none; border: 0; color: var(--rouge); font-size: .86rem;
+                 text-decoration: underline; cursor: pointer; font-family: inherit;
+                 padding: .3rem .4rem; }
+  .bouton-danger { width: 100%; background: var(--rouge); color: #fff; border: 0;
+    border-radius: 8px; padding: .8rem 1.1rem; font-size: 1rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; }
+  .bouton-danger:hover { background: #8f3826; }
+  .bouton-danger:disabled { background: var(--trait); color: var(--gris); cursor: not-allowed; }
+  .bouton-neutre { width: 100%; background: none; border: 0; color: var(--gris);
+    padding: .5rem; font-size: .92rem; cursor: pointer; font-family: inherit; }
+
+  /* ---- listes et pastilles ---- */
+  .ligne-nom { display: block; font-weight: 600; }
+  .ligne-appui { display: block; font-size: .8rem; font-weight: 400; color: var(--gris);
+                 margin-top: .1rem; }
+  .ec { display: inline-block; border-radius: 1rem; padding: .06rem .55rem; font-size: .8rem;
+        font-weight: 700; background: #fdf2ef; color: var(--rouge); border: 1px solid #e8c4bb;
+        white-space: nowrap; }
+  .cellule-action { display: flex; align-items: center; justify-content: center;
+                    gap: .5rem; flex-wrap: wrap; }
+  .mini-bouton { background: var(--vert); color: #fff; border: 0; border-radius: 7px;
+                 padding: .3rem .7rem; font-size: .8rem; font-weight: 600;
+                 font-family: inherit; line-height: 1.3; cursor: pointer; white-space: nowrap; }
+  .mini-bouton:hover { background: #1f4d38; }
+  .mini-bouton.clair { background: #fff; border: 1px solid var(--trait); color: var(--encre); }
+  .mini-bouton.clair:hover { background: var(--panneau); }
+  .action-annuler { color: var(--vert); font-weight: 600; }
+  .rangee.sans-action { cursor: default; color: var(--gris); }
+  .rangee.sans-action:hover { background: none; }
+  .rangee.attention { background: var(--terre-clair); }
+  .age { display: inline-block; border-radius: 1rem; padding: .06rem .55rem;
+         font-size: .78rem; font-weight: 700; white-space: nowrap; }
+  .age.rouge { background: #fdf2ef; color: var(--rouge); border: 1px solid #e8c4bb; }
+  .age.ocre { background: var(--terre-clair); color: var(--terre); border: 1px solid #ead9bd; }
+  .age.vert { background: var(--vert-clair); color: var(--vert); border: 1px solid #c3ddd0; }
+  .pied-liste { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    flex-wrap: wrap; padding: .7rem .5rem; margin-top: .6rem;
+    border-top: 1px solid var(--trait); font-size: .86rem; color: var(--gris); }
+  .encart-manquant { background: var(--terre-clair); border: 1px solid #ead9bd;
+    border-radius: 10px; padding: .7rem .85rem; font-size: .88rem; color: #7a5410;
+    margin-bottom: .9rem; line-height: 1.5; }
+
+  /* ---- vider l'appareil ---- */
+  .etat-appareil { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+                   margin-bottom: 1rem; }
+  .etat-carte { border: 1px solid var(--trait); border-radius: 10px; padding: .6rem .8rem; }
+  .etat-carte b { display: block; font-size: 1.3rem; font-weight: 700;
+                  font-variant-numeric: tabular-nums; }
+  .etat-carte span { display: block; font-size: .78rem; color: var(--gris); margin-top: .1rem; }
+  .encadre-etat { border: 1px solid var(--trait); border-radius: 10px; padding: .6rem .85rem;
+                  margin-bottom: 1rem; }
+  .ligne-etat { display: flex; justify-content: space-between; gap: 1rem; font-size: .88rem;
+                padding: .4rem 0; border-top: 1px solid var(--trait); }
+  .ligne-etat:first-child { border-top: 0; }
+  .ligne-etat span { color: var(--gris); }
+  .ligne-etat b.en-retard { color: var(--terre); }
+  .avertissement { border-radius: 10px; padding: .8rem .9rem; margin-bottom: 1rem;
+                   line-height: 1.55; font-size: .88rem; }
+  .avertissement.rouge { background: #fdf2ef; border: 1px solid #e8c4bb; color: #7a3524; }
+  .avertissement.ocre { background: var(--terre-clair); border: 1px solid #ead9bd; color: #7a5410; }
+  .avertissement.vert { background: var(--vert-clair); border: 1px solid #c3ddd0; color: #1f4d38; }
+
+  /* ---- activite ---- */
+  .chiffres-activite { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+                       margin-bottom: 1rem; }
+  .chiffre-activite { border: 1px solid var(--trait); border-radius: 10px; padding: .65rem .8rem; }
+  .chiffre-activite b { display: block; font-size: 1.5rem; font-weight: 700;
+                        font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .chiffre-activite span { display: block; font-size: .77rem; color: var(--gris); margin-top: .1rem; }
+  .chiffre-activite.vif { background: var(--vert-clair); border-color: transparent; }
+  .chiffre-activite.vif b { color: #1f4d38; }
+  .barres-mois { display: inline-flex; align-items: flex-end; gap: 2px; height: 1.3rem; }
+  .barres-mois i { width: 5px; background: var(--vert); border-radius: 1px; display: block;
+                   opacity: .75; }
+  .barres-mois i.creux { background: var(--trait); opacity: 1; }
+  .depuis { font-size: .86rem; color: var(--gris); }
+  .depuis.vieux { color: var(--terre); font-weight: 600; }
+  .note-activite { background: var(--panneau); border-left: 3px solid var(--trait);
+    border-radius: 0 8px 8px 0; padding: .6rem .8rem; font-size: .83rem; color: var(--gris);
+    line-height: 1.55; margin-top: 1rem; }
 </style>
 </head>
 <body>
@@ -542,6 +676,7 @@ if ('serviceWorker' in navigator) {
 <script src="reglages.js"></script>
 <script src="export.js"></script>
 <script src="comptes.js"></script>
+  <script src="outils.js"></script>
 
 <script>
 // PrixTerrain — ouverture de session et passage d'un écran à l'autre.
@@ -676,7 +811,11 @@ if ('serviceWorker' in navigator) {
   var ECRANS = {
     accueil:      { titre: 'Accueil',       afficher: function (z, c) { return A.afficherAccueil(z, c); } },
 
-    outils:       { titre: 'Outils',        afficher: function (z, c) { return ecranOutils(z, c); } },
+    outils:       { titre: 'Outils',        afficher: function (z, c) { return A.afficherOutils(z, c); } },
+    releves:      { titre: 'Relevés',       afficher: function (z, c) { return A.afficherReleves(z, c); } },
+    'a-relever':  { titre: 'Produits à relever', afficher: function (z, c) { return A.afficherARelever(z, c); } },
+    vider:        { titre: 'Vider cet appareil', afficher: function (z, c) { return A.afficherVider(z, c); } },
+    activite:     { titre: 'Activité de l\'équipe', afficher: function (z, c) { return A.afficherActivite(z, c); } },
     compte:       { titre: 'Mon compte',    afficher: function (z, c) { return A.afficherComptes(z, c); } },
     saisie:       { titre: 'Saisir un prix', afficher: function (z, c, p) { return A.afficherSaisie(z, c, p); } },
     produit:      { titre: 'Fiche produit', afficher: function (z, c, p) { return A.afficherFicheProduit(z, c, p); } },
@@ -774,31 +913,6 @@ if ('serviceWorker' in navigator) {
   retour.addEventListener('click', revenir);
 
   // Écran Outils : porte d'entrée vers les pages qui ne méritent pas un onglet.
-  function ecranOutils(z, compte) {
-    var entrees = [
-      { nom: 'export',   libelle: 'Export tableur',
-        aide: 'Les relevés et les prix moyens dans un fichier pour votre tableur.' },
-      { nom: 'doublons', libelle: 'Fiches en double',
-        aide: 'Rapprocher deux fiches produit ou fournisseur qui désignent la même chose.' }
-    ];
-    if (compte.role === 'administrateur') {
-      entrees.push({ nom: 'reglages', libelle: 'Réglages',
-        aide: 'Les durées, seuils et coefficients qui commandent le calcul des prix moyens.' });
-    }
-    var grille = document.createElement('div');
-    grille.className = 'grille';
-    z.appendChild(grille);
-    entrees.forEach(function (e) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'carte';
-      b.innerHTML = '<div class="carte-haut"><span class="carte-titre">' + e.libelle +
-                    '</span><span class="carte-date">›</span></div>' +
-                    '<div class="carte-bas"><span>' + e.aide + '</span></div>';
-      b.addEventListener('click', function () { naviguer(e.nom); });
-      grille.appendChild(b);
-    });
-  }
 
   function demarrerApplication(compte) {
     compteCourant = compte;

@@ -450,28 +450,6 @@
     .ecran-fiche .tableau-prix .rangee .col-prix { font-size: inherit; font-weight: inherit; }
     .ecran-fiche .tableau-prix .rangee.mieux { background: var(--vert-clair); }
     .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
-    .etat-appareil { grid-template-columns: repeat(4, 1fr); }
-    .chiffres-activite { grid-template-columns: repeat(4, 1fr); }
-    .reglage-champs { grid-template-columns: repeat(3, 1fr); }
-    .reglage-champs.un { grid-template-columns: 1fr; max-width: 18rem; }
-    .pied-reglages .principal { max-width: 26rem; margin: 0 auto; display: block; }
-    .solutions.deux { grid-template-columns: 1fr 1fr; }
-    .solutions.trois { grid-template-columns: repeat(3, 1fr); }
-    .ligne-produit { grid-template-columns: minmax(0,1fr) 10rem 8rem; }
-    .ligne-produit .case-large { grid-column: auto; }
-    .solution .ligne-produit { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
-    .solution .ligne-produit .case-large { grid-column: 1 / -1; }
-    .doublon { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 11rem 15rem;
-      gap: 1rem; align-items: center; border: 0; border-top: 1px solid var(--trait);
-      border-radius: 0; margin-bottom: 0; padding: .7rem .5rem; }
-    .table-doublons .doublon:last-child { border-bottom: 1px solid var(--trait); }
-    .doublon.entete { display: grid; background: var(--vert-clair); border-top: 0;
-      border-bottom: 1px solid var(--trait); border-radius: 8px 8px 0 0; padding: .7rem .5rem; }
-    .doublon.entete span { font-size: .88rem; font-weight: 600; letter-spacing: .02em;
-      text-transform: uppercase; color: var(--encre); }
-    .doublon-b { margin-top: 0; padding-top: 0; border-top: 0; }
-    .doublon-raison { margin-top: 0; text-align: center; }
-    .doublon-actions { margin-top: 0; }
     .rangee.entete {
       display: grid; cursor: default; border-top: 0; border-bottom: 1px solid var(--trait);
       background: var(--vert-clair); border-radius: 8px 8px 0 0; padding: .7rem .5rem;
@@ -887,6 +865,47 @@
   .cf-appui { display: block; font-size: .82rem; color: var(--gris); margin-top: .1rem; }
   .consequence { background: var(--vert-clair); border-radius: 8px; padding: .6rem .75rem;
     font-size: .85rem; color: #1f4d38; line-height: 1.5; margin: .3rem 0 0; }
+
+  /* Surcharges pour grand écran : posées en fin de feuille pour l'emporter
+     sur les styles de base des écrans ajoutés au-dessus. */
+  @media (min-width: 900px) {
+    .etat-appareil { grid-template-columns: repeat(4, 1fr); }
+    .chiffres-activite { grid-template-columns: repeat(4, 1fr); }
+    .reglage-champs { grid-template-columns: repeat(3, 1fr); }
+    .reglage-champs.un { grid-template-columns: 1fr; max-width: 18rem; }
+    .pied-reglages .principal { max-width: 26rem; margin: 0 auto; display: block; }
+
+    .solutions.deux { grid-template-columns: 1fr 1fr; }
+    .solutions.trois { grid-template-columns: repeat(3, 1fr); }
+    .ligne-produit { grid-template-columns: minmax(0, 1fr) 10rem 8rem; }
+    .ligne-produit .case-large { grid-column: auto; }
+    .solution .ligne-produit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .solution .ligne-produit .case-large { grid-column: 1 / -1; }
+
+    .doublon { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 11rem 15rem;
+      gap: 1rem; align-items: center; background: none; border: 0;
+      border-top: 1px solid var(--trait); border-radius: 0; margin-bottom: 0;
+      padding: .7rem .5rem; }
+    .table-doublons .doublon:last-child { border-bottom: 1px solid var(--trait); }
+    .doublon.entete { display: grid; background: var(--vert-clair); border-top: 0;
+      border-bottom: 1px solid var(--trait); border-radius: 8px 8px 0 0; padding: .7rem .5rem; }
+    .doublon.entete span { font-size: .88rem; font-weight: 600; letter-spacing: .02em;
+      text-transform: uppercase; color: var(--encre); }
+    .doublon-b { margin-top: 0; padding-top: 0; border-top: 0; }
+    .doublon-raison { margin-top: 0; text-align: center; }
+    .doublon-actions { margin-top: 0; }
+
+    .ecran-fiche .tableau-prix .rangee {
+      border: 0; border-top: 1px solid var(--trait); border-radius: 0;
+      margin-bottom: 0; padding: .75rem .5rem; row-gap: 0;
+    }
+    .ecran-fiche .tableau-prix .rangee:last-child { border-bottom: 1px solid var(--trait); }
+    .ecran-fiche .tableau-prix .rangee .col-produit { font-size: inherit; font-weight: 600; }
+    .ecran-fiche .tableau-prix .rangee .col-prix { font-size: inherit; font-weight: inherit; }
+    .ecran-fiche .tableau-prix .rangee.mieux { background: var(--vert-clair); }
+    .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
+    .ecran-fiche .tableau-prix .rangee.perime { background: var(--panneau); }
+  }
 </style>
 </head>
 <body>
@@ -1115,7 +1134,7 @@ if ('serviceWorker' in navigator) {
     ONGLETS.forEach(function (nom) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'onglet-bas' + (!pile.length && nom === ongletCourant ? ' actif' : '');
+      b.className = 'onglet-bas' + (nom === ongletCourant ? ' actif' : '');
       b.textContent = LIBELLES_ONGLETS[nom];
       b.addEventListener('click', function () { naviguer(nom); });
       barre.appendChild(b);

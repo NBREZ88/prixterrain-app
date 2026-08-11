@@ -44,9 +44,11 @@
   }
   #entete h1 { font-size: 1.15rem; margin: 0; font-weight: 600; color: #fff; }
   #retour {
-    background: none; border: 0; color: #fff; font-size: 1.5rem;
-    line-height: 1; padding: 0 .2rem; cursor: pointer; display: none;
+    margin-left: auto; background: none; border: 1px solid rgba(255,255,255,.45);
+    color: #fff; font-size: .92rem; font-family: inherit; border-radius: 8px;
+    padding: .35rem .8rem; cursor: pointer; display: none; white-space: nowrap;
   }
+  #retour:hover { background: rgba(255,255,255,.12); }
   #application {
     max-width: 40rem; margin: 0 auto;
     padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
@@ -890,8 +892,8 @@
 <body>
 
 <header id="entete">
-  <button id="retour" type="button" aria-label="Revenir">‹</button>
   <h1 id="titre">PrixTerrain</h1>
+  <button id="retour" type="button">‹ Retour</button>
 </header>
 
 <div id="application"><p class="appui">Un instant…</p></div>

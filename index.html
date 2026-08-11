@@ -855,6 +855,10 @@
   .doublon-lien { color: var(--gris); font-weight: 400; }
   .doublon-appui { display: block; font-size: .81rem; color: var(--gris); margin-top: .1rem; }
   .doublon-raison { display: block; margin-top: .6rem; }
+  /* La ressemblance s'écrit en toutes lettres : la pastille passe à la ligne
+     plutôt que de déborder sur les boutons. */
+  .doublon-raison .age { white-space: normal; line-height: 1.35; text-align: center;
+                         padding: .2rem .6rem; }
   .doublon-actions { display: flex; align-items: center; justify-content: center;
                      gap: .5rem; flex-wrap: wrap; margin-top: .7rem; }
   .carte-fiche { display: block; width: 100%; text-align: left; background: #fff;
@@ -882,8 +886,8 @@
     .solution .ligne-produit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .solution .ligne-produit .case-large { grid-column: 1 / -1; }
 
-    .doublon { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 11rem 15rem;
-      gap: 1rem; align-items: center; background: none; border: 0;
+    .doublon { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 13rem 15rem;
+      gap: 1.4rem; align-items: center; background: none; border: 0;
       border-top: 1px solid var(--trait); border-radius: 0; margin-bottom: 0;
       padding: .7rem .5rem; }
     .table-doublons .doublon:last-child { border-bottom: 1px solid var(--trait); }

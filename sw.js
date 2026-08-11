@@ -3,7 +3,7 @@
 // À chaque lot livré, changer le numéro de VERSION ci-dessous : c'est ce qui
 // déclenche le remplacement de la copie sur les appareils des conseillers.
 
-var VERSION = 'prixterrain-31';
+var VERSION = 'prixterrain-32';
 
 var FICHIERS = [
   './',

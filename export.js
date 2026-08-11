@@ -1,55 +1,42 @@
 // PrixTerrain — export tableur.
-//
-// Deux fichiers, produits sur l'appareil à partir des données déjà présentes :
-// les relevés un par un, et les moyennes calculées avec les mêmes règles qu'à
-// l'écran. Aucun réseau n'est nécessaire.
-//
-// Séparateur point-virgule et virgule décimale : c'est ce qu'attend un tableur
-// réglé en français. Le fichier commence par une marque d'encodage sans
-// laquelle les accents sortent abîmés.
+// Un produit par ligne, un fournisseur par colonne, plus la moyenne toutes
+// offres. Le fichier est un classeur Excel mis en forme.
+// Réservé à l'ordinateur : une colonne par fournisseur ne se lit pas sur
+// un écran de téléphone, et il faut un tableur pour l'ouvrir.
 
 (function (global) {
   'use strict';
 
   var A = global.PrixTerrain;
-  var SEPARATEUR = ';';
-  var MARQUE_ENCODAGE = '\uFEFF';
 
-  function cellule(valeur) {
-    if (valeur === null || valeur === undefined) return '';
-    var texte = String(valeur);
-    if (texte.indexOf(SEPARATEUR) >= 0 || texte.indexOf('"') >= 0 || texte.indexOf('\n') >= 0) {
-      return '"' + texte.replace(/"/g, '""') + '"';
-    }
-    return texte;
-  }
+  var VERT       = '2F6F4F';
+  var VERT_CLAIR = 'EEF2EF';
+  var VERT_FONCE = '1F4D38';
+  var GRIS       = '78807F';
+  var TRAIT      = 'E4E6E2';
+  var PANNEAU    = 'FBFBFA';
 
-  function nombreTableur(valeur, decimales) {
-    if (valeur === null || valeur === undefined) return '';
-    return Number(valeur).toFixed(decimales === undefined ? 2 : decimales).replace('.', ',');
-  }
+  var bibliotheque = null;
 
-  function construireFichier(entetes, lignes) {
-    var contenu = [entetes.map(cellule).join(SEPARATEUR)];
-    lignes.forEach(function (ligne) { contenu.push(ligne.map(cellule).join(SEPARATEUR)); });
-    return MARQUE_ENCODAGE + contenu.join('\r\n') + '\r\n';
-  }
-
-  function telecharger(nom, contenu) {
-    var fichier = new Blob([contenu], { type: 'text/csv;charset=utf-8' });
-    var adresse = URL.createObjectURL(fichier);
-    var lien = global.document.createElement('a');
-    lien.href = adresse;
-    lien.download = nom;
-    global.document.body.appendChild(lien);
-    lien.click();
-    global.document.body.removeChild(lien);
-    setTimeout(function () { URL.revokeObjectURL(adresse); }, 2000);
-  }
-
-  function dateFichier() {
-    var d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  // La bibliothèque pèse près d'un mégaoctet : elle n'est chargée qu'ici,
+  // au moment où l'on ouvre l'écran, et jamais sur un téléphone.
+  function chargerBibliotheque() {
+    if (bibliotheque) return bibliotheque;
+    bibliotheque = new Promise(function (resoudre, rejeter) {
+      if (global.ExcelJS) return resoudre(global.ExcelJS);
+      var balise = document.createElement('script');
+      balise.src = 'exceljs.min.js';
+      balise.onload = function () {
+        global.ExcelJS ? resoudre(global.ExcelJS)
+                       : rejeter(new Error('bibliothèque tableur illisible'));
+      };
+      balise.onerror = function () {
+        rejeter(new Error('La bibliothèque tableur n\'a pas pu être chargée. ' +
+                          'Il faut du réseau la première fois.'));
+      };
+      document.head.appendChild(balise);
+    });
+    return bibliotheque;
   }
 
   function afficherExport(zone, compte) {
@@ -57,214 +44,365 @@
     var element = C.element;
     var bouton = C.bouton;
 
-    var contexte = null;
-    var reglages = null;
-
     zone.innerHTML = '';
-    var bandeau = element('header', 'bandeau');
-    bandeau.appendChild(element('h1', null, 'Export tableur'));
-    zone.appendChild(bandeau);
-    zone.appendChild(element('p', null, 'Préparation…'));
 
-    Promise.all([C.chargerContexte(), C.chargerReglages(), A.bd.releve.toArray()])
+    if (window.innerWidth < 900) {
+      zone.appendChild(element('div', 'encart-manquant',
+        'L\'export se fait depuis un ordinateur. Le fichier compte une colonne par ' +
+        'fournisseur : il ne se lit pas sur un écran de téléphone, et il faut un ' +
+        'tableur pour l\'ouvrir.'));
+      zone.appendChild(element('p', 'vide',
+        'Ouvrez PrixTerrain sur votre poste pour exporter les prix moyens.'));
+      return;
+    }
+
+    var familleActive = '';
+    var avecNombres = false;
+    var contexte = null, reglages = null, releves = [], fournisseurs = [];
+
+    zone.appendChild(element('p', 'appui',
+      'Un produit par ligne, un fournisseur par colonne, et la moyenne toutes offres. ' +
+      'Les moyennes suivent les réglages de l\'application.'));
+
+    var onglets = element('div', 'sel-onglets');
+    zone.appendChild(onglets);
+
+    var option = document.createElement('label');
+    option.className = 'option-export';
+    var caseAcocher = document.createElement('input');
+    caseAcocher.type = 'checkbox';
+    caseAcocher.addEventListener('change', function () {
+      avecNombres = caseAcocher.checked;
+      poser();
+    });
+    option.appendChild(caseAcocher);
+    option.appendChild(element('span', null,
+      'Ajouter le nombre de relevés derrière chaque fournisseur'));
+    zone.appendChild(option);
+
+    var boutonExport = bouton('action-large', 'Exporter le fichier', exporter);
+    boutonExport.style.marginBottom = '1rem';
+    zone.appendChild(boutonExport);
+
+    var message = element('p', 'alerte');
+    message.style.display = 'none';
+    zone.appendChild(message);
+
+    zone.appendChild(element('p', 'titre-section', 'Aperçu du fichier'));
+    var apercu = element('div', 'zone-apercu-export');
+    apercu.appendChild(element('p', 'appui', 'Lecture…'));
+    zone.appendChild(apercu);
+    A.suivreHauteur(apercu);
+
+    Promise.all([C.chargerContexte(), C.chargerReglages(), A.relevesRetenus(),
+                 A.bd.fournisseur.toArray()])
       .then(function (r) {
         contexte = r[0];
         reglages = r[1];
-        dessiner(r[2]);
+        releves = r[2];
+        fournisseurs = r[3].filter(function (f) { return !f.fusionne_vers; })
+          .sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+        poserOnglets();
+        poser();
       });
 
-    function dessiner(tousReleves) {
-      zone.innerHTML = '';
-      var bandeau = element('header', 'bandeau');
-      bandeau.appendChild(element('h1', null, 'Export tableur'));
-      zone.appendChild(bandeau);
-
-      zone.appendChild(element('p', 'appui',
-        'Les fichiers s\'ouvrent dans un tableur. Ils sont produits sur cet appareil ' +
-        'à partir des relevés déjà reçus : sans réseau, ils reflètent le dernier échange avec l\'équipe.'));
-
-      // Choix de la famille
-      var champFamille = element('div', 'champ');
-      champFamille.appendChild(element('span', 'etiquette', 'Famille de produits'));
-      var listeFamille = element('select', 'saisie');
-      listeFamille.appendChild(new Option('toutes les familles', ''));
-      Object.keys(contexte.familles).forEach(function (code) {
-        listeFamille.appendChild(new Option(contexte.familles[code].libelle, code));
+    function poserOnglets() {
+      onglets.innerHTML = '';
+      var entrees = [['', 'Tout']];
+      Object.keys(contexte.familles).forEach(function (k) {
+        entrees.push([k, contexte.familles[k].libelle]);
       });
-      champFamille.appendChild(listeFamille);
-      zone.appendChild(champFamille);
-
-      // Bornes de dates
-      var champDebut = element('div', 'champ');
-      champDebut.appendChild(element('span', 'etiquette', 'Relevés à partir du'));
-      var saisieDebut = element('input', 'saisie');
-      saisieDebut.type = 'date';
-      champDebut.appendChild(saisieDebut);
-      zone.appendChild(champDebut);
-
-      var champFin = element('div', 'champ');
-      champFin.appendChild(element('span', 'etiquette', "Jusqu'au"));
-      var saisieFin = element('input', 'saisie');
-      saisieFin.type = 'date';
-      champFin.appendChild(saisieFin);
-      zone.appendChild(champFin);
-
-      var champAnnules = element('div', 'champ');
-      var caseAnnules = element('input');
-      caseAnnules.type = 'checkbox';
-      caseAnnules.id = 'inclure-annules';
-      var etiquetteAnnules = element('label', 'etiquette-case', ' Faire figurer aussi les relevés annulés');
-      etiquetteAnnules.setAttribute('for', 'inclure-annules');
-      champAnnules.appendChild(caseAnnules);
-      champAnnules.appendChild(etiquetteAnnules);
-      zone.appendChild(champAnnules);
-
-      var message = element('p', 'confirmation');
-      message.style.display = 'none';
-      zone.appendChild(message);
-
-      function annonce(texte) {
-        message.textContent = texte;
-        message.style.display = 'block';
-      }
-
-      function selection() {
-        var annules = {};
-        tousReleves.forEach(function (r) {
-          if (r.type === 'annulation') annules[r.releve_annule_id] = r;
-        });
-        var famille = listeFamille.value;
-        var debut = saisieDebut.value;
-        var fin = saisieFin.value;
-
-        return tousReleves.filter(function (r) {
-          if (r.type !== 'prix') return false;
-          if (!caseAnnules.checked && annules[r.id]) return false;
-          if (debut && r.date_prix < debut) return false;
-          if (fin && r.date_prix > fin) return false;
-          if (famille) {
-            var p = C.ficheConservee(contexte.produits, r.produit_id);
-            if (!p || p.famille_code !== famille) return false;
-          }
-          return true;
-        }).map(function (r) {
-          return { releve: r, annule: Boolean(annules[r.id]) };
-        });
-      }
-
-      zone.appendChild(element('p', 'titre-section', 'Les relevés un par un'));
-      zone.appendChild(element('p', 'manquant-suite',
-        'Une ligne par relevé : date, fournisseur, produit, prix, unité, ' +
-        'conseiller ayant saisi, remarque.'));
-      zone.appendChild(bouton('enregistrer', 'Obtenir le fichier des relevés', function () {
-        var choisis = selection();
-        if (!choisis.length) { annonce('Aucun relevé ne correspond à ce choix.'); return; }
-        telecharger('prixterrain-releves-' + dateFichier() + '.csv', fichierReleves(choisis));
-        annonce(choisis.length + (choisis.length > 1 ? ' relevés exportés.' : ' relevé exporté.'));
-      }));
-
-      zone.appendChild(element('p', 'titre-section', 'Les prix moyens'));
-      zone.appendChild(element('p', 'manquant-suite',
-        'Une ligne par produit, fournisseur et unité. Chaque moyenne sort avec le nombre de ' +
-        'relevés qui la composent, la date du plus ancien et la mention de pondération.'));
-      zone.appendChild(bouton('enregistrer', 'Obtenir le fichier des prix moyens', function () {
-        var choisis = selection().filter(function (c) { return !c.annule; });
-        if (!choisis.length) { annonce('Aucun relevé ne correspond à ce choix.'); return; }
-        var lignes = fichierMoyennes(choisis.map(function (c) { return c.releve; }));
-        if (!lignes) { annonce('Aucune moyenne à produire pour ce choix.'); return; }
-        telecharger('prixterrain-prix-moyens-' + dateFichier() + '.csv', lignes);
-        annonce('Fichier des prix moyens produit.');
-      }));
+      entrees.forEach(function (e) {
+        onglets.appendChild(bouton(familleActive === e[0] ? 'on' : '', e[1], function () {
+          familleActive = e[0];
+          poserOnglets();
+          poser();
+        }));
+      });
     }
 
-    // -----------------------------------------------------------------------
-    // Fichier 1 : les relevés
-    // -----------------------------------------------------------------------
-    function fichierReleves(choisis) {
-      var entetes = ['Date du prix', 'Fournisseur', 'Produit', 'Famille', 'Segment',
-                     'Prix hors taxes', 'Unité', 'Saisi par', 'Saisi le', 'Remarque', 'État'];
-
-      var lignes = choisis.map(function (c) {
-        var r = c.releve;
-        var fournisseur = C.ficheConservee(contexte.fournisseurs, r.fournisseur_id);
-        var produit = C.ficheConservee(contexte.produits, r.produit_id);
-        var famille = produit ? contexte.familles[produit.famille_code] : null;
-        var unite = contexte.unites[r.unite_code];
-        var auteur = contexte.profils ? contexte.profils[r.saisi_par] : null;
-
-        return [
-          C.dateFrancaise(r.date_prix),
-          fournisseur ? fournisseur.nom : 'fiche non retrouvée',
-          produit ? produit.nom : 'fiche non retrouvée',
-          famille ? famille.libelle : '',
-          produit && produit.segment ? produit.segment : '',
-          nombreTableur(r.prix_unitaire_ht),
-          unite ? unite.libelle : r.unite_code,
-          auteur ? auteur.nom : '',
-          C.dateFrancaise(r.saisi_le),
-          r.commentaire || '',
-          c.annule ? 'annulé' : 'retenu'
-        ];
-      });
-
-      lignes.sort(function (a, b) {
-        if (a[2] !== b[2]) return a[2].localeCompare(b[2], 'fr');
-        return a[0].split('/').reverse().join('').localeCompare(b[0].split('/').reverse().join(''));
-      });
-
-      return construireFichier(entetes, lignes);
-    }
-
-    // -----------------------------------------------------------------------
-    // Fichier 2 : les prix moyens
-    // -----------------------------------------------------------------------
-    function fichierMoyennes(releves) {
-      var entetes = ['Produit', 'Famille', 'Fournisseur', 'Unité', 'Prix moyen', 'Pondération',
-                     'Nombre de relevés', 'Plus ancien relevé', 'Observation'];
-
+    // Une ligne par produit et par unité : deux unités ne se mélangent jamais.
+    function lignesExport() {
       var parProduit = {};
-      releves.forEach(function (r) {
-        var p = C.ficheConservee(contexte.produits, r.produit_id);
-        var id = p ? p.id : 'inconnu';
-        if (!parProduit[id]) parProduit[id] = { produit: p, releves: [] };
-        parProduit[id].releves.push(r);
+      releves.forEach(function (x) {
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        if (!p) return;
+        if (familleActive && p.famille_code !== familleActive) return;
+        (parProduit[p.id] = parProduit[p.id] || { produit: p, lignes: [] }).lignes.push(x);
       });
 
-      var lignes = [];
+      var out = [];
       Object.keys(parProduit).forEach(function (id) {
-        var bloc = parProduit[id];
-        var famille = bloc.produit ? bloc.produit.famille_code : '';
-        var resultat = C.calculerAgregats(bloc.releves, contexte, reglages, famille);
+        var lot = parProduit[id];
+        var parUnite = {};
+        lot.lignes.forEach(function (x) {
+          (parUnite[x.unite_code] = parUnite[x.unite_code] || []).push(x);
+        });
 
-        resultat.lignes.forEach(function (ligne) {
-          var observation = '';
-          if (!ligne.calculable) {
-            if (resultat.validiteAbsente) observation = 'moyenne non calculable : durée de validité non paramétrée';
-            else if (resultat.minimumAbsent) observation = 'moyenne non calculable : nombre minimal de relevés non paramétré';
-            else observation = 'moyenne non calculable : moins de relevés que le minimum exigé';
-          }
-          lignes.push([
-            bloc.produit ? bloc.produit.nom : 'fiche non retrouvée',
-            famille && contexte.familles[famille] ? contexte.familles[famille].libelle : '',
-            ligne.nomGroupe,
-            ligne.unite.libelle,
-            ligne.calculable ? nombreTableur(ligne.moyenne) : '',
-            ligne.calculable ? (ligne.pondere ? 'pondérée' : 'non pondérée') : '',
-            ligne.nombre,
-            C.dateFrancaise(ligne.plusAncien),
-            observation
-          ]);
+        Object.keys(parUnite).forEach(function (u) {
+          var duBloc = parUnite[u];
+          var cases = {};
+          fournisseurs.forEach(function (f) {
+            var siens = duBloc.filter(function (x) {
+              var g = C.ficheConservee(contexte.fournisseurs, x.fournisseur_id);
+              return g && g.id === f.id;
+            });
+            cases[f.id] = siens.length ? { prix: moyenne(siens), nombre: siens.length } : null;
+          });
+
+          out.push({
+            produit: lot.produit,
+            unite: contexte.unites[u] || { code: u, libelle: u },
+            cases: cases,
+            globale: moyenne(duBloc),
+            nombre: duBloc.length,
+            plusAncien: duBloc.map(function (x) { return String(x.date_prix); }).sort()[0]
+          });
         });
       });
+      out.sort(function (a, b) { return a.produit.nom.localeCompare(b.produit.nom, 'fr'); });
+      return out;
 
-      if (!lignes.length) return null;
+      function moyenne(lot) {
+        var somme = 0;
+        lot.forEach(function (x) { somme += Number(x.prix_unitaire_ht); });
+        return somme / lot.length;
+      }
+    }
 
-      lignes.sort(function (a, b) {
-        if (a[0] !== b[0]) return a[0].localeCompare(b[0], 'fr');
-        return a[2].localeCompare(b[2], 'fr');
+    function entetes() {
+      var t = ['Produit', 'Famille', 'Type', 'Unité'];
+      fournisseurs.forEach(function (f) {
+        t.push(f.nom);
+        if (avecNombres) t.push('Relevés ' + f.nom);
+      });
+      return t.concat(['Moyenne toutes offres', 'Relevés retenus', 'Plus ancien relevé']);
+    }
+
+    function poser() {
+      apercu.innerHTML = '';
+      var lignes = lignesExport();
+
+      if (!lignes.length) {
+        apercu.appendChild(element('p', 'vide', 'Aucun produit relevé dans cette famille.'));
+        A.ajusterHauteurs();
+        return;
+      }
+
+      var colonnes = entetes();
+      var enveloppe = element('div', 'enveloppe-export');
+      var table = document.createElement('table');
+      table.className = 'tableau-export';
+
+      var tr = document.createElement('tr');
+      colonnes.forEach(function (t, i) {
+        var th = document.createElement('th');
+        if (i === 0) th.className = 'col-nom';
+        th.textContent = t;
+        tr.appendChild(th);
+      });
+      table.appendChild(tr);
+
+      lignes.forEach(function (l) {
+        var r = document.createElement('tr');
+        cellule(r, l.produit.nom, 'col-nom');
+        cellule(r, contexte.familles[l.produit.famille_code]
+          ? contexte.familles[l.produit.famille_code].libelle : l.produit.famille_code);
+        cellule(r, l.produit.type_code && contexte.types[l.produit.type_code]
+          ? contexte.types[l.produit.type_code].libelle : '');
+        cellule(r, l.unite.libelle);
+        fournisseurs.forEach(function (f) {
+          var c = l.cases[f.id];
+          cellule(r, c ? C.nombreFrancais(c.prix) : '', c ? 'nombre' : 'rien');
+          if (avecNombres) cellule(r, c ? String(c.nombre) : '', c ? 'nombre' : 'rien');
+        });
+        cellule(r, C.nombreFrancais(l.globale), 'nombre globale');
+        cellule(r, String(l.nombre), 'nombre');
+        cellule(r, C.dateFrancaise(l.plusAncien));
+        table.appendChild(r);
       });
 
-      return construireFichier(entetes, lignes);
+      enveloppe.appendChild(table);
+      apercu.appendChild(enveloppe);
+
+      var pied = element('div', 'pied-liste');
+      pied.appendChild(element('span', null,
+        lignes.length + (lignes.length > 1 ? ' lignes' : ' ligne') + ' · ' +
+        colonnes.length + ' colonnes'));
+      pied.appendChild(element('span', 'pied-appui', rappelReglages()));
+      apercu.appendChild(pied);
+      A.ajusterHauteurs();
+
+      function cellule(ligne, texte, classe) {
+        var td = document.createElement('td');
+        if (classe) td.className = classe;
+        td.textContent = texte;
+        ligne.appendChild(td);
+      }
+    }
+
+    function rappelReglages() {
+      return 'Un prix est retenu tant qu\'il a moins de : ' +
+        Object.keys(contexte.familles).map(function (k) {
+          var v = reglages.valeur('duree_validite', k);
+          return contexte.familles[k].libelle + ' ' +
+                 (v === null ? 'non réglée' : C.nombreFrancais(v, 0) + ' mois');
+        }).join(' · ');
+    }
+
+    // -----------------------------------------------------------------------
+    // Fabrication du classeur
+    // -----------------------------------------------------------------------
+    function exporter() {
+      var lignes = lignesExport();
+      if (!lignes.length) return;
+
+      message.textContent = 'Préparation du fichier…';
+      message.style.display = 'block';
+
+      chargerBibliotheque().then(function (ExcelJS) {
+        var classeur = new ExcelJS.Workbook();
+        var feuille = classeur.addWorksheet('Prix moyens', {
+          views: [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }],
+          pageSetup: { orientation: 'landscape' }
+        });
+
+        var colonnes = entetes();
+        var aujourdhui = new Date();
+        var dateTexte = C.dateFrancaise(
+          new Date(aujourdhui.getTime() - aujourdhui.getTimezoneOffset() * 60000)
+            .toISOString().slice(0, 10));
+
+        titre(1, 'PrixTerrain — prix moyens par fournisseur', 14, true, VERT_FONCE);
+        titre(2, 'Édité le ' + dateTexte +
+                 (familleActive ? ' · ' + contexte.familles[familleActive].libelle
+                                : ' · toutes familles'), 10, false, GRIS);
+        titre(3, rappelReglages() + ' · moyennes non pondérées', 10, false, GRIS);
+
+        var ligneEntete = feuille.getRow(5);
+        colonnes.forEach(function (t, i) {
+          var c = ligneEntete.getCell(i + 1);
+          c.value = t;
+          c.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF' + VERT_FONCE } };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + VERT_CLAIR } };
+          c.alignment = { horizontal: i === 0 ? 'left' : 'center',
+                          vertical: 'middle', wrapText: true };
+          c.border = bordure();
+        });
+        ligneEntete.height = 32;
+
+        lignes.forEach(function (l, rang) {
+          var r = feuille.getRow(6 + rang);
+          var zebre = rang % 2 ? PANNEAU : null;
+          var prix = [];
+          fournisseurs.forEach(function (f) {
+            if (l.cases[f.id]) prix.push(l.cases[f.id].prix);
+          });
+          var mini = prix.length > 1 ? Math.min.apply(null, prix) : null;
+
+          var col = 1;
+          poserCellule(r, col++, l.produit.nom, { gras: true, gauche: true, fond: zebre });
+          poserCellule(r, col++, contexte.familles[l.produit.famille_code]
+            ? contexte.familles[l.produit.famille_code].libelle : l.produit.famille_code,
+            { gauche: true, couleur: GRIS, fond: zebre });
+          poserCellule(r, col++, l.produit.type_code && contexte.types[l.produit.type_code]
+            ? contexte.types[l.produit.type_code].libelle : '',
+            { gauche: true, couleur: GRIS, fond: zebre });
+          poserCellule(r, col++, l.unite.libelle, { couleur: GRIS, fond: zebre });
+
+          fournisseurs.forEach(function (f) {
+            var c = l.cases[f.id];
+            var moinsCher = c && mini !== null && c.prix === mini;
+            poserCellule(r, col++, c ? c.prix : null, {
+              format: '# ##0.00 €',
+              gras: moinsCher,
+              couleur: moinsCher ? VERT_FONCE : null,
+              fond: moinsCher ? VERT_CLAIR : zebre
+            });
+            if (avecNombres) {
+              poserCellule(r, col++, c ? c.nombre : null, { fond: zebre });
+            }
+          });
+
+          poserCellule(r, col++, l.globale,
+            { format: '# ##0.00 €', gras: true, couleur: VERT_FONCE, fond: zebre });
+          poserCellule(r, col++, l.nombre, { fond: zebre });
+          poserCellule(r, col++, C.dateFrancaise(l.plusAncien), { couleur: GRIS, fond: zebre });
+          r.height = 20;
+        });
+
+        var legende = 6 + lignes.length + 1;
+        titre(legende, 'Lecture du tableau', 10, true, null);
+        [
+          'Une ligne par produit et par unité : un produit relevé au litre et au kilo occupe deux lignes.',
+          'Cellule verte : le fournisseur le moins cher de la ligne. Cellule vide : aucun relevé de ce produit chez lui.',
+          'La moyenne toutes offres réunit les relevés de tous les fournisseurs, sans pondération.',
+          'Les colonnes « Relevés retenus » et « Plus ancien relevé » disent sur quoi repose cette moyenne.'
+        ].forEach(function (texte, i) {
+          titre(legende + 1 + i, texte, 9, false, GRIS);
+        });
+
+        largeurs(colonnes.length);
+        feuille.autoFilter = {
+          from: { row: 5, column: 1 },
+          to: { row: 5 + lignes.length, column: colonnes.length }
+        };
+
+        return classeur.xlsx.writeBuffer().then(function (tampon) {
+          var nom = 'prixterrain-prix-moyens-' +
+            new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.xlsx';
+          var lien = document.createElement('a');
+          lien.href = URL.createObjectURL(new Blob([tampon], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          }));
+          lien.download = nom;
+          document.body.appendChild(lien);
+          lien.click();
+          document.body.removeChild(lien);
+          setTimeout(function () { URL.revokeObjectURL(lien.href); }, 1000);
+          message.style.display = 'none';
+        });
+
+        function bordure() {
+          var fin = { style: 'thin', color: { argb: 'FF' + TRAIT } };
+          return { left: fin, right: fin, top: fin, bottom: fin };
+        }
+
+        function titre(rang, texte, taille, gras, couleur) {
+          var c = feuille.getRow(rang).getCell(1);
+          c.value = texte;
+          c.font = { name: 'Arial', size: taille, bold: !!gras,
+                     color: { argb: 'FF' + (couleur || '16181A') } };
+        }
+
+        function poserCellule(ligne, colonne, valeur, options) {
+          options = options || {};
+          var c = ligne.getCell(colonne);
+          if (valeur !== null && valeur !== undefined && valeur !== '') c.value = valeur;
+          c.font = { name: 'Arial', size: 10, bold: !!options.gras,
+                     color: { argb: 'FF' + (options.couleur || '16181A') } };
+          if (options.fond) {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + options.fond } };
+          }
+          c.alignment = { horizontal: options.gauche ? 'left' : 'center', vertical: 'middle' };
+          if (options.format) c.numFmt = options.format;
+          c.border = bordure();
+        }
+
+        function largeurs(nombre) {
+          feuille.getColumn(1).width = 26;
+          feuille.getColumn(2).width = 20;
+          feuille.getColumn(3).width = 18;
+          feuille.getColumn(4).width = 8;
+          for (var i = 5; i <= nombre - 3; i++) feuille.getColumn(i).width = 13;
+          feuille.getColumn(nombre - 2).width = 15;
+          feuille.getColumn(nombre - 1).width = 11;
+          feuille.getColumn(nombre).width = 14;
+        }
+      }).catch(function (e) {
+        message.textContent = A.messageSimple(e);
+        message.style.display = 'block';
+      });
     }
   }
 

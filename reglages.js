@@ -1,273 +1,368 @@
-// PrixTerrain — écran Réglages.
-//
-// Les neuf lignes de réglage vivent en base. Cet écran les lit et les écrit,
-// il n'en invente aucune et n'en calcule aucune. Les bornes acceptées viennent
-// des colonnes valeur_min et valeur_max de la table.
+// PrixTerrain — écran Réglages, réservé aux responsables.
+// Quatre valeurs commandent les prix moyens de toute l'équipe.
+// Chacune est présentée par une question, un exemple chiffré, et l'effet
+// qu'elle produit sur les relevés du moment.
 
 (function (global) {
   'use strict';
 
   var A = global.PrixTerrain;
+  var JOURS_PAR_MOIS = 30.4375;
 
-  var AIDES = {
-    decote_mensuelle: 'Par exemple 0,05 : un relevé perd 5 % de son poids par mois d\'ancienneté. ' +
-                      'Laissez vide pour que tous les relevés pèsent pareil.',
-    ecart_atypique: 'Par exemple 30 : un relevé qui s\'écarte de plus de 30 % du prix médian est signalé.'
-  };
+  function ageEnMois(date) {
+    return (Date.now() - new Date(String(date) + 'T00:00:00').getTime()) / 86400000 / JOURS_PAR_MOIS;
+  }
 
   function afficherReglages(zone, compte) {
     var C = A.calculs;
     var element = C.element;
     var bouton = C.bouton;
 
+    zone.innerHTML = '';
+    if (!compte || compte.role !== 'administrateur') {
+      zone.appendChild(element('p', 'vide', 'Cet écran est réservé aux responsables.'));
+      return;
+    }
+
+    zone.appendChild(element('p', 'appui', 'Lecture…'));
+
+    var contexte = null, lignes = [], releves = [], types = [];
+    var brouillon = {};
+
+    Promise.all([C.chargerContexte(), A.bd.reglage.orderBy('ordre').toArray(),
+                 A.relevesRetenus(), A.bd.type_produit.orderBy('ordre').toArray(),
+                 A.bd.releve.where('type').equals('prix').toArray()])
+      .then(function (r) {
+        contexte = r[0];
+        lignes = r[1];
+        releves = r[4];   // tous les relevés de prix, périmés compris
+        types = r[3];
+        lignes.forEach(function (l) {
+          brouillon[cle(l)] = (l.valeur === null || l.valeur === undefined)
+            ? null : Number(l.valeur);
+        });
+        dessiner();
+      });
+
+    function cle(l) { return l.cle + '|' + (l.famille_code || ''); }
+
     function dessiner() {
       zone.innerHTML = '';
 
-      var bandeau = element('header', 'bandeau');
-      bandeau.appendChild(element('h1', null, 'Réglages'));
-      zone.appendChild(bandeau);
+      var barre = element('div');
+      zone.appendChild(barre);
 
-      zone.appendChild(element('p', 'appui',
-        'Ces valeurs commandent le calcul des prix moyens affichés dans les écrans Prix et Qui. ' +
-        'Une valeur laissée vide n\'empêche rien : la conduite tenue à défaut est indiquée sous chaque ligne.'));
+      zone.appendChild(element('p', 'intro-reglages',
+        'Ces valeurs commandent tous les prix moyens de l\'application, et s\'appliquent à ' +
+        'toute l\'équipe. Chaque réglage est expliqué avec un exemple.'));
 
-      var liste = element('div');
-      liste.appendChild(element('p', null, 'Lecture des réglages…'));
-      zone.appendChild(liste);
+      var corps = element('div');
+      zone.appendChild(corps);
 
-      A.bd.reglage.toArray().then(function (lignes) {
-        lignes.sort(function (a, b) { return (a.ordre || 0) - (b.ordre || 0); });
-        liste.innerHTML = '';
+      var manquants = 0;
+      lignes.forEach(function (l) { if (brouillon[cle(l)] === null) manquants++; });
 
-        var champs = [];
-        var familleCourante = '@';
-        lignes.forEach(function (ligne) {
-          var famille = ligne.famille_code || '';
-          if (famille !== familleCourante) {
-            familleCourante = famille;
-            liste.appendChild(element('p', 'titre-section',
-              famille ? libelleFamille(famille) : 'Valables pour toutes les familles'));
-          }
-          var carte = carteReglage(ligne, champs);
-          liste.appendChild(carte);
-        });
+      var etat = element('div', manquants ? 'barre-reglages' : 'barre-reglages ok');
+      etat.appendChild(element('b', null, manquants ? String(manquants) : '✓'));
+      etat.appendChild(element('span', null, manquants
+        ? (manquants > 1 ? 'valeurs à renseigner. ' : 'valeur à renseigner. ') +
+          'Tant qu\'elles sont vides, les prix moyens ne s\'affichent pas.'
+        : 'Tous les réglages sont renseignés. Les prix moyens sont calculés.'));
+      barre.appendChild(etat);
 
-        liste.appendChild(blocEnregistrement(champs));
-        liste.appendChild(blocJournal());
+      // --- durée de validité, une par famille ---
+      var duree = lignes.filter(function (l) { return l.cle === 'duree_validite'; });
+      var ecartes = 0, total = 0;
+      releves.forEach(function (x) {
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        if (!p) return;
+        total++;
+        var v = brouillon['duree_validite|' + p.famille_code];
+        if (v === null || ageEnMois(x.date_prix) > v) ecartes++;
       });
+
+      corps.appendChild(carte(
+        'Combien de temps un prix reste-t-il valable ?',
+        'Au-delà de cette durée, le relevé n\'entre plus dans les prix moyens. ' +
+        'Il reste affiché dans l\'historique du produit, en gris.',
+        'Avec <b>18 mois</b> pour les phytos : un prix relevé en <b>mars 2025</b> compte ' +
+        '<span class="oui">encore</span>. Un prix de <b>décembre 2024</b> ' +
+        '<span class="non">ne compte plus</span> dans la moyenne, mais il reste visible ' +
+        'dans la fiche du produit.',
+        duree.map(function (l) {
+          var f = contexte.familles[l.famille_code];
+          return { ligne: l, libelle: f ? f.libelle : l.famille_code, unite: 'mois' };
+        }),
+        { texte: ecartes
+            ? 'Aujourd\'hui, ' + ecartes + ' relevés sur ' + total +
+              ' n\'entreraient pas dans les moyennes.'
+            : 'Aujourd\'hui, les ' + total + ' relevés entreraient tous dans les moyennes.',
+          absent: manquants > 0 }));
+
+      // --- écart atypique ---
+      var atypique = lignes.filter(function (l) { return l.cle === 'ecart_atypique'; });
+      var seuil = brouillon['ecart_atypique|'];
+      var signales = seuil === null ? 0 : compterSignales(seuil);
+
+      corps.appendChild(carte(
+        'À partir de quel écart un prix est-il suspect ?',
+        'Un relevé qui s\'écarte de plus que cette part du prix médian de son produit ' +
+        'apparaît dans « Relevés à vérifier ».',
+        'Avec <b>30 %</b> : sur un produit dont le prix médian est <b>150 €</b>, un relevé ' +
+        'à <b>200 €</b> est <span class="non">signalé</span>, un relevé à <b>180 €</b> ne ' +
+        'l\'est <span class="oui">pas</span>.',
+        atypique.map(function (l) {
+          return { ligne: l, libelle: 'Écart au prix médian', unite: '%' };
+        }),
+        { texte: seuil === null
+            ? 'Tant que cette valeur est vide, aucun relevé n\'est signalé.'
+            : 'Aujourd\'hui, ' + signales +
+              (signales > 1 ? ' relevés seraient signalés.' : ' relevé serait signalé.'),
+          absent: seuil === null }));
+
+      // --- vocabulaire des types ---
+      corps.appendChild(element('p', 'titre-section', 'Types de produit'));
+      corps.appendChild(element('p', 'reglage-role',
+        'Le type est demandé une seule fois, à la création d\'un produit. ' +
+        'Il sert à filtrer les listes. Les engrais n\'en ont pas.'));
+
+      var alerteType = element('p', 'alerte-type');
+      alerteType.style.display = 'none';
+
+      Object.keys(contexte.familles).forEach(function (code) {
+        var liste = types.filter(function (t) { return t.famille_code === code; });
+        var bloc = element('div', 'reglage');
+
+        var tete = element('div', 'reglage-tete');
+        tete.appendChild(element('p', 'reglage-question', contexte.familles[code].libelle));
+        tete.appendChild(element('p', 'reglage-role', liste.length
+          ? liste.length + (liste.length > 1 ? ' types proposés' : ' type proposé') +
+            ' à la création d\'un produit de cette famille.'
+          : 'Aucun type : la question ne sera pas posée.'));
+        bloc.appendChild(tete);
+
+        var dedans = element('div', 'reglage-corps');
+        var puces = element('div', 'liste-types');
+        liste.forEach(function (t) {
+          var puce = element('span', 'puce-type');
+          puce.appendChild(element('span', null, t.libelle));
+          puce.appendChild(bouton('puce-retirer', '✕', function () {
+            retirerType(t, alerteType);
+          }));
+          puces.appendChild(puce);
+        });
+        if (!liste.length) puces.appendChild(element('span', 'aucun-type', 'Aucun type'));
+        dedans.appendChild(puces);
+
+        var ajout = element('div', 'ajout-type');
+        var champ = element('input', 'saisie');
+        champ.type = 'text';
+        champ.placeholder = 'Nouveau type';
+        ajout.appendChild(champ);
+        ajout.appendChild(bouton('mini-bouton', 'Ajouter', function () {
+          ajouterType(code, champ.value.trim(), alerteType);
+        }));
+        dedans.appendChild(ajout);
+        bloc.appendChild(dedans);
+        corps.appendChild(bloc);
+      });
+      corps.appendChild(alerteType);
+
+      // --- pied ---
+      var pied = element('div', 'pied-reglages');
+      var message = element('p', 'alerte');
+      message.style.display = 'none';
+      pied.appendChild(bouton('principal pleine', 'Enregistrer les réglages', function () {
+        enregistrer(message);
+      }));
+      pied.appendChild(message);
+
+      var derniere = lignes.filter(function (l) { return l.modifie_le; })
+        .sort(function (a, b) { return String(b.modifie_le).localeCompare(String(a.modifie_le)); })[0];
+      if (derniere) {
+        var qui = contexte.profils[derniere.modifie_par];
+        pied.appendChild(element('p', 'journal-reglages',
+          'Dernière modification : ' + (qui ? qui.nom : 'un responsable') +
+          ', le ' + C.dateFrancaise(String(derniere.modifie_le).slice(0, 10)) + '.'));
+      }
+      zone.appendChild(pied);
+
+      function carte(question, role, exemple, champs, effet) {
+        var c = element('div', 'reglage');
+        var tete = element('div', 'reglage-tete');
+        tete.appendChild(element('p', 'reglage-question', question));
+        tete.appendChild(element('p', 'reglage-role', role));
+        c.appendChild(tete);
+
+        var dedans = element('div', 'reglage-corps');
+        var ex = element('div', 'reglage-exemple');
+        ex.innerHTML = exemple;
+        dedans.appendChild(ex);
+
+        var grille = element('div', 'reglage-champs' + (champs.length === 1 ? ' un' : ''));
+        champs.forEach(function (ch) {
+          var valeur = brouillon[cle(ch.ligne)];
+          var bloc = element('div', 'reglage-champ' + (valeur === null ? ' vide' : ''));
+          bloc.appendChild(element('label', null, ch.libelle));
+          var mesure = element('div', 'reglage-mesure');
+          var i = element('input');
+          i.type = 'text';
+          i.inputMode = 'numeric';
+          i.value = valeur === null ? '' : C.nombreFrancais(valeur, 0);
+          i.placeholder = '—';
+          i.addEventListener('change', function () {
+            var brut = String(i.value).replace(',', '.').trim();
+            var v = Number(brut);
+            brouillon[cle(ch.ligne)] = (brut && isFinite(v) && v > 0) ? v : null;
+            dessiner();
+          });
+          mesure.appendChild(i);
+          mesure.appendChild(element('span', null, ch.unite));
+          bloc.appendChild(mesure);
+          grille.appendChild(bloc);
+        });
+        dedans.appendChild(grille);
+
+        if (effet) {
+          dedans.appendChild(element('p', 'reglage-effet' + (effet.absent ? ' absent' : ''),
+            effet.texte));
+        }
+        c.appendChild(dedans);
+        return c;
+      }
     }
 
-    var libellesFamille = {};
-    function libelleFamille(code) {
-      return libellesFamille[code] || code;
+    function compterSignales(seuil) {
+      var parProduit = {};
+      releves.forEach(function (x) {
+        var p = C.ficheConservee(contexte.produits, x.produit_id);
+        if (!p) return;
+        var v = brouillon['duree_validite|' + p.famille_code];
+        if (v === null || ageEnMois(x.date_prix) > v) return;
+        var clef = p.id + '|' + x.unite_code;
+        (parProduit[clef] = parProduit[clef] || []).push(Number(x.prix_unitaire_ht));
+      });
+      var n = 0;
+      Object.keys(parProduit).forEach(function (k) {
+        var prix = parProduit[k].slice().sort(function (a, b) { return a - b; });
+        var m = prix.length % 2
+          ? prix[(prix.length - 1) / 2]
+          : (prix[prix.length / 2 - 1] + prix[prix.length / 2]) / 2;
+        if (!m) return;
+        prix.forEach(function (v) {
+          if (Math.abs((v - m) / m * 100) > seuil) n++;
+        });
+      });
+      return n;
     }
 
-    function decimales(ligne) {
-      return ligne.cle === 'decote_mensuelle' ? 2 : 0;
-    }
+    // -----------------------------------------------------------------------
+    // Écriture : un réglage engage l'équipe, il passe par la base et non par
+    // la file d'attente d'un seul appareil.
+    // -----------------------------------------------------------------------
+    function enregistrer(message) {
+      var aEcrire = lignes.filter(function (l) {
+        var avant = (l.valeur === null || l.valeur === undefined) ? null : Number(l.valeur);
+        return brouillon[cle(l)] !== avant;
+      });
 
-    function carteReglage(ligne, champs) {
-      var carte = element('div', 'groupe');
-      carte.appendChild(element('p', 'titre-bloc', ligne.libelle));
-
-      var renseigne = ligne.valeur !== null && ligne.valeur !== undefined;
-      var etat = element('p', renseigne ? 'valeur-moyenne' : 'valeur-absente');
-      etat.textContent = renseigne
-        ? C.nombreFrancais(ligne.valeur, decimales(ligne)) + ' ' + ligne.unite_reglage
-        : 'Non renseigné';
-      carte.appendChild(etat);
-
-      if (!renseigne) carte.appendChild(element('p', 'manquant-suite', ligne.conduite_si_vide));
-      if (AIDES[ligne.cle]) carte.appendChild(element('p', 'manquant-suite', AIDES[ligne.cle]));
-      if (ligne.valeur_min !== null && ligne.valeur_max !== null) {
-        carte.appendChild(element('p', 'manquant-suite',
-          'Valeur acceptée entre ' + C.nombreFrancais(ligne.valeur_min, decimales(ligne)) +
-          ' et ' + C.nombreFrancais(ligne.valeur_max, decimales(ligne)) +
-          ', ou vide pour ne rien imposer.'));
+      if (!aEcrire.length) {
+        message.textContent = 'Aucun changement à enregistrer.';
+        message.style.display = 'block';
+        return;
+      }
+      if (!global.navigator.onLine) {
+        message.textContent = 'Sans réseau, les réglages ne peuvent pas être enregistrés : ' +
+                              'ils engagent toute l\'équipe.';
+        message.style.display = 'block';
+        return;
       }
 
-      var saisie = element('input', 'saisie');
-      saisie.type = 'text';
-      saisie.inputMode = 'decimal';
-      saisie.placeholder = 'à renseigner';
-      if (renseigne) saisie.value = C.nombreFrancais(ligne.valeur, decimales(ligne));
-      carte.appendChild(saisie);
+      message.textContent = 'Enregistrement…';
+      message.style.display = 'block';
 
-      var alerte = element('p', 'alerte');
-      alerte.style.display = 'none';
-      carte.appendChild(alerte);
-
-      champs.push({ ligne: ligne, saisie: saisie, alerte: alerte });
-      return carte;
-    }
-
-    // Contrôle de toutes les lignes avant la moindre écriture : rien ne part
-    // tant qu'une valeur est refusée, pour ne pas laisser un écran à moitié
-    // enregistré.
-    function verifier(champs) {
-      var retenus = [];
-      var refus = 0;
-
-      champs.forEach(function (champ) {
-        champ.alerte.style.display = 'none';
-        var ligne = champ.ligne;
-        var brut = champ.saisie.value.trim().replace(',', '.');
-        var valeur = brut === '' ? null : Number(brut);
-
-        if (brut !== '' && !isFinite(valeur)) {
-          champ.alerte.textContent = 'Cette valeur n\'est pas un nombre.';
-          champ.alerte.style.display = 'block';
-          refus++;
-          return;
-        }
-        if (valeur !== null && ligne.valeur_min !== null && valeur < ligne.valeur_min) {
-          champ.alerte.textContent = 'Valeur trop basse : le minimum est ' +
-            C.nombreFrancais(ligne.valeur_min, decimales(ligne)) + '.';
-          champ.alerte.style.display = 'block';
-          refus++;
-          return;
-        }
-        if (valeur !== null && ligne.valeur_max !== null && valeur > ligne.valeur_max) {
-          champ.alerte.textContent = 'Valeur trop haute : le maximum est ' +
-            C.nombreFrancais(ligne.valeur_max, decimales(ligne)) + '.';
-          champ.alerte.style.display = 'block';
-          refus++;
-          return;
-        }
-
-        var actuelle = (ligne.valeur === null || ligne.valeur === undefined) ? null : Number(ligne.valeur);
-        if (valeur !== actuelle) retenus.push({ ligne: ligne, valeur: valeur });
+      var suite = Promise.resolve();
+      aEcrire.forEach(function (l) {
+        suite = suite.then(function () { return ecrire(l, brouillon[cle(l)]); });
       });
-
-      return { refus: refus, retenus: retenus };
-    }
-
-    function blocEnregistrement(champs) {
-      var bloc = element('div', 'pied-reglages');
-      var message = element('p', 'confirmation');
-      message.style.display = 'none';
-      var alerte = element('p', 'alerte');
-      alerte.style.display = 'none';
-
-      bloc.appendChild(message);
-      bloc.appendChild(alerte);
-      bloc.appendChild(bouton('enregistrer', 'Enregistrer les réglages', function () {
-        var bouton = this;
-        message.style.display = 'none';
-        alerte.style.display = 'none';
-
-        var controle = verifier(champs);
-        if (controle.refus) {
-          alerte.textContent = controle.refus > 1
-            ? controle.refus + ' valeurs sont refusées. Rien n\'a été enregistré.'
-            : 'Une valeur est refusée. Rien n\'a été enregistré.';
-          alerte.style.display = 'block';
-          return;
-        }
-        if (!controle.retenus.length) {
-          message.textContent = 'Aucun changement à enregistrer.';
+      suite.then(function () { return A.bd.reglage.orderBy('ordre').toArray(); })
+        .then(function (r) {
+          lignes = r;
+          message.style.display = 'none';
+          dessiner();
+        })
+        .catch(function (e) {
+          message.textContent = A.messageSimple(e);
           message.style.display = 'block';
-          return;
-        }
-        if (!global.navigator.onLine) {
-          alerte.textContent = "L'équipe n'est pas joignable pour l'instant. Les réglages se modifient avec du réseau.";
-          alerte.style.display = 'block';
-          return;
-        }
-
-        bouton.disabled = true;
-        bouton.textContent = 'Un instant…';
-
-        controle.retenus.reduce(function (chaine, item) {
-          return chaine.then(function () { return ecrire(item.ligne, item.valeur); });
-        }, Promise.resolve())
-          .then(function () { return A.synchroniser(); })
-          .then(function () {
-            dessiner();
-            zone.scrollIntoView({ block: 'start' });
-          })
-          .catch(function (erreur) {
-            bouton.disabled = false;
-            bouton.textContent = 'Enregistrer les réglages';
-            alerte.textContent = A.messageSimple(erreur);
-            alerte.style.display = 'block';
-          });
-      }));
-      return bloc;
+        });
     }
 
-    // L'écriture passe par la base d'équipe : un réglage engage les dix
-    // conseillers, il ne se met pas en file d'attente sur un seul appareil.
     function ecrire(ligne, valeur) {
-      var requete = A.base.from('reglage').update({ valeur: valeur }).eq('cle', ligne.cle);
+      var requete = A.base.from('reglage')
+        .update({ valeur: valeur, modifie_par: compte.id, modifie_le: new Date().toISOString() })
+        .eq('cle', ligne.cle);
       requete = ligne.famille_code
         ? requete.eq('famille_code', ligne.famille_code)
         : requete.is('famille_code', null);
-
       return requete.then(function (reponse) {
         if (reponse.error) throw reponse.error;
         return A.bd.reglage.put(Object.assign({}, ligne, { valeur: valeur }));
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Journal des changements
-    // -----------------------------------------------------------------------
-    function blocJournal() {
-      var bloc = element('div');
-      bloc.appendChild(bouton('lien', 'Voir qui a changé quoi', function () {
-        bloc.innerHTML = '';
-        bloc.appendChild(element('p', 'titre-section', 'Derniers changements'));
-        var corps = element('div');
-        corps.appendChild(element('p', null, 'Lecture en cours…'));
-        bloc.appendChild(corps);
+    function ajouterType(famille, libelle, alerte) {
+      alerte.style.display = 'none';
+      if (!libelle) return;
+      var code = libelle.toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9]+/g, '_');
+      if (types.some(function (t) { return t.code === code; })) {
+        alerte.textContent = libelle + ' figure déjà dans la liste.';
+        alerte.style.display = 'block';
+        return;
+      }
+      var ordre = types.filter(function (t) { return t.famille_code === famille; }).length + 1;
+      var ligne = { code: code, libelle: libelle, famille_code: famille, ordre: ordre, actif: true };
 
-        if (!global.navigator.onLine) {
-          corps.innerHTML = '';
-          corps.appendChild(element('p', 'alerte',
-            "L'équipe n'est pas joignable pour l'instant. Le journal se consulte avec du réseau."));
+      A.base.from('type_produit').insert(ligne).then(function (reponse) {
+        if (reponse.error) {
+          alerte.textContent = A.messageSimple(reponse.error);
+          alerte.style.display = 'block';
           return;
         }
-
-        Promise.all([
-          A.base.from('reglage_historique').select('*').order('modifie_le', { ascending: false }).limit(20),
-          A.bd.profil.toArray(),
-          A.bd.reglage.toArray()
-        ]).then(function (r) {
-          if (r[0].error) throw r[0].error;
-          var noms = {};
-          r[1].forEach(function (p) { noms[p.id] = p.nom; });
-          var libelles = {};
-          r[2].forEach(function (l) { libelles[l.cle + '|' + (l.famille_code || '')] = l.libelle; });
-
-          corps.innerHTML = '';
-          if (!r[0].data.length) {
-            corps.appendChild(element('p', 'confirmation', 'Aucun réglage n\'a encore été modifié.'));
-            return;
-          }
-          var liste = element('ul', 'liste-releves');
-          r[0].data.forEach(function (h) {
-            var libelle = libelles[h.cle + '|' + (h.famille_code || '')] || h.cle;
-            var avant = h.ancienne_valeur === null ? 'vide' : C.nombreFrancais(h.ancienne_valeur, 2);
-            var apres = h.nouvelle_valeur === null ? 'vide' : C.nombreFrancais(h.nouvelle_valeur, 2);
-            liste.appendChild(element('li', null,
-              C.dateFrancaise(h.modifie_le) + ' — ' + libelle +
-              ' : ' + avant + ' devient ' + apres +
-              ' — ' + (noms[h.modifie_par] || 'compte non retrouvé')));
-          });
-          corps.appendChild(liste);
-        }).catch(function (erreur) {
-          corps.innerHTML = '';
-          corps.appendChild(element('p', 'alerte', A.messageSimple(erreur)));
+        return A.bd.type_produit.put(ligne).then(function () {
+          types.push(ligne);
+          dessiner();
         });
-      }));
-      return bloc;
+      });
     }
 
-    A.bd.famille_produit.toArray().then(function (familles) {
-      familles.forEach(function (f) { libellesFamille[f.code] = f.libelle; });
-      dessiner();
-    });
+    function retirerType(type, alerte) {
+      alerte.style.display = 'none';
+      A.bd.produit.where('famille_code').equals(type.famille_code).toArray()
+        .then(function (produits) {
+          var utilises = produits.filter(function (p) { return p.type_code === type.code; }).length;
+          if (utilises) {
+            alerte.textContent = type.libelle + ' est utilisé par ' + utilises +
+              (utilises > 1 ? ' produits' : ' produit') + ' : il ne peut pas être retiré.';
+            alerte.style.display = 'block';
+            return;
+          }
+          return A.base.from('type_produit').delete().eq('code', type.code)
+            .then(function (reponse) {
+              if (reponse.error) throw reponse.error;
+              return A.bd.type_produit.delete(type.code);
+            })
+            .then(function () {
+              types = types.filter(function (t) { return t.code !== type.code; });
+              dessiner();
+            });
+        })
+        .catch(function (e) {
+          alerte.textContent = A.messageSimple(e);
+          alerte.style.display = 'block';
+        });
+    }
   }
 
   A.afficherReglages = afficherReglages;

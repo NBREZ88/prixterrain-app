@@ -446,6 +446,9 @@
     .ecran-fiche .tableau-prix .rangee.attention { background: var(--terre-clair); }
     .etat-appareil { grid-template-columns: repeat(4, 1fr); }
     .chiffres-activite { grid-template-columns: repeat(4, 1fr); }
+    .reglage-champs { grid-template-columns: repeat(3, 1fr); }
+    .reglage-champs.un { grid-template-columns: 1fr; max-width: 18rem; }
+    .pied-reglages .principal { max-width: 26rem; margin: 0 auto; display: block; }
     .rangee.entete {
       display: grid; cursor: default; border-top: 0; border-bottom: 1px solid var(--trait);
       background: var(--vert-clair); border-radius: 8px 8px 0 0; padding: .7rem .5rem;
@@ -635,6 +638,72 @@
   .note-activite { background: var(--panneau); border-left: 3px solid var(--trait);
     border-radius: 0 8px 8px 0; padding: .6rem .8rem; font-size: .83rem; color: var(--gris);
     line-height: 1.55; margin-top: 1rem; }
+
+  /* ---- réglages ---- */
+  .barre-reglages { display: flex; align-items: center; gap: .7rem; background: var(--terre-clair);
+    border: 1px solid #ead9bd; border-radius: 10px; padding: .7rem .85rem; margin-bottom: 1rem;
+    font-size: .88rem; color: #7a5410; line-height: 1.5; }
+  .barre-reglages b { font-size: 1.25rem; color: var(--terre); flex: 0 0 auto; }
+  .barre-reglages.ok { background: var(--vert-clair); border-color: #c3ddd0; color: #1f4d38; }
+  .barre-reglages.ok b { color: var(--vert); }
+  .intro-reglages { font-size: .87rem; color: var(--gris); margin: 0 0 1.1rem; line-height: 1.55; }
+  .reglage { border: 1px solid var(--trait); border-radius: 12px; margin-bottom: .9rem;
+             overflow: hidden; }
+  .reglage-tete { padding: .75rem .9rem .6rem; border-bottom: 1px solid var(--trait); }
+  .reglage-question { margin: 0; font-size: 1.02rem; font-weight: 700; }
+  .reglage-role { margin: .25rem 0 0; font-size: .87rem; color: var(--gris); line-height: 1.55; }
+  .reglage-corps { padding: .75rem .9rem; }
+  .reglage-exemple { background: var(--panneau); border-left: 3px solid var(--vert);
+    border-radius: 0 8px 8px 0; padding: .6rem .8rem; font-size: .85rem; line-height: 1.6;
+    margin-bottom: .75rem; }
+  .reglage-exemple .oui { color: var(--vert); font-weight: 700; }
+  .reglage-exemple .non { color: var(--rouge); font-weight: 700; }
+  .reglage-champs { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+  .reglage-champ label { display: block; font-size: .76rem; font-weight: 600; margin-bottom: .2rem; }
+  .reglage-mesure { display: flex; align-items: center; gap: .4rem; }
+  .reglage-mesure input { flex: 1; min-width: 0; height: 2.6rem; font-size: .98rem;
+    padding: 0 .7rem; border: 1px solid var(--trait); border-radius: 8px; font-family: inherit;
+    text-align: right; }
+  .reglage-champ.vide input { border-color: #ead9bd; background: var(--terre-clair); }
+  .reglage-mesure span { font-size: .86rem; color: var(--gris); white-space: nowrap; }
+  .reglage-effet { margin: .65rem 0 0; font-size: .83rem; color: var(--vert); line-height: 1.5; }
+  .reglage-effet.absent { color: var(--terre); }
+  .pied-reglages { margin-top: 1.2rem; padding-top: .9rem; border-top: 1px solid var(--trait); }
+  .journal-reglages { margin: .6rem 0 0; font-size: .8rem; color: var(--gris); text-align: center; }
+  .liste-types { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .7rem; }
+  .puce-type { display: inline-flex; align-items: center; gap: .35rem;
+    border: 1px solid var(--trait); background: #fff; border-radius: 1rem;
+    padding: .15rem .3rem .15rem .7rem; font-size: .85rem; }
+  .puce-retirer { background: none; border: 0; color: var(--gris); font-size: .78rem;
+    cursor: pointer; font-family: inherit; padding: .1rem .3rem; border-radius: 50%; line-height: 1; }
+  .puce-retirer:hover { background: #fdf2ef; color: var(--rouge); }
+  .aucun-type { font-size: .85rem; color: var(--gris); font-style: italic; }
+  .ajout-type { display: flex; gap: .4rem; align-items: center; }
+  .ajout-type .saisie { flex: 1; min-width: 0; height: 2.4rem; font-size: .92rem;
+    padding: 0 .7rem; border: 1px solid var(--trait); border-radius: 8px; font-family: inherit; }
+  .alerte-type { background: var(--terre-clair); border: 1px solid #ead9bd; border-radius: 8px;
+    padding: .55rem .75rem; font-size: .85rem; color: #7a5410; margin: .3rem 0 0; }
+
+  /* ---- export ---- */
+  .option-export { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
+    color: var(--encre); margin: 0 0 .9rem; cursor: pointer; }
+  .option-export input { width: 1rem; height: 1rem; accent-color: var(--vert); }
+  .zone-apercu-export { display: flex; flex-direction: column; min-height: 0; }
+  .enveloppe-export { overflow: auto; min-height: 0; border: 1px solid var(--trait);
+                      border-radius: 10px; }
+  table.tableau-export { border-collapse: collapse; width: 100%; font-size: .87rem; }
+  table.tableau-export th { background: var(--vert-clair); font-size: .78rem; font-weight: 600;
+    letter-spacing: .02em; text-transform: uppercase; padding: .5rem .6rem; text-align: center;
+    border-bottom: 1px solid var(--trait); position: sticky; top: 0; z-index: 2;
+    white-space: nowrap; }
+  table.tableau-export th.col-nom { text-align: left; }
+  table.tableau-export td { padding: .45rem .6rem; border-top: 1px solid var(--trait);
+    white-space: nowrap; text-align: center; }
+  table.tableau-export td.col-nom { text-align: left; position: sticky; left: 0; background: #fff;
+    z-index: 1; font-weight: 600; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
+  table.tableau-export td.nombre { font-variant-numeric: tabular-nums; }
+  table.tableau-export td.globale { font-weight: 700; color: var(--vert); }
+  table.tableau-export td.rien { background: var(--panneau); }
 </style>
 </head>
 <body>

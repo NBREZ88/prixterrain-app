@@ -31,11 +31,15 @@
 
     Promise.all([C.chargerContexte(), A.bd.reglage.orderBy('ordre').toArray(),
                  A.relevesRetenus(), A.bd.type_produit.orderBy('ordre').toArray(),
-                 A.bd.releve.where('type').equals('prix').toArray()])
+                 A.bd.releve.toArray()])
       .then(function (r) {
         contexte = r[0];
         lignes = r[1];
-        releves = r[4];   // tous les relevés de prix, périmés compris
+        // Tous les relevés de prix, périmés compris : l'effet d'un réglage se
+        // mesure sur l'ensemble, pas seulement sur ce qui est retenu aujourd'hui.
+        releves = r[4].filter(function (x) {
+          return x.type === 'prix' && x.etat !== 'annule';
+        });
         types = r[3];
         lignes.forEach(function (l) {
           brouillon[cle(l)] = (l.valeur === null || l.valeur === undefined)

@@ -27,6 +27,41 @@
       .replace(/[^A-Z0-9]/g, '');
   }
 
+  // Regroupe les fiches par début de nom : deux fiches qui ne partagent pas
+  // leurs premières lettres ne peuvent pas être un doublon de frappe.
+  function pairesProches(fiches) {
+    var casiers = {};
+    fiches.forEach(function (f) {
+      if (f.fusionne_vers) return;
+      var n = normaliser(f.nom);
+      if (!n) return;
+      var clef = n.slice(0, 3);
+      (casiers[clef] = casiers[clef] || []).push({ fiche: f, nom: n });
+    });
+
+    var out = [];
+    Object.keys(casiers).forEach(function (clef) {
+      var lot = casiers[clef];
+      if (lot.length > 60) return;   // casier trop gros : comparaison inutile
+      for (var i = 0; i < lot.length; i++) {
+        for (var j = i + 1; j < lot.length; j++) {
+          var a = lot[i], b = lot[j];
+          var raison = null, force = null;
+          if (a.nom === b.nom) { raison = 'même nom, écrit autrement'; force = 'fort'; }
+          else if (Math.abs(a.nom.length - b.nom.length) <= 2 &&
+                   distance(a.nom, b.nom) <= 2 &&
+                   Math.min(a.nom.length, b.nom.length) >= 4) {
+            raison = 'deux caractères de différence'; force = 'fort';
+          } else if (a.nom.indexOf(b.nom) === 0 || b.nom.indexOf(a.nom) === 0) {
+            raison = 'l\'un commence par l\'autre'; force = 'moyen';
+          }
+          if (raison) out.push({ a: a.fiche, b: b.fiche, raison: raison, force: force });
+        }
+      }
+    });
+    return out;
+  }
+
   function distance(a, b) {
     var d = [], i, j;
     for (i = 0; i <= a.length; i++) d[i] = [i];
@@ -49,27 +84,32 @@
     if (seuil === null) return [];
 
     var C = A.calculs;
-    var parProduit = {};
+
+    // Médiane par produit et par unité, sur les seuls relevés encore valables.
+    var groupes = {};
     releves.forEach(function (x) {
       if (confirmes && confirmes[x.id]) return;
       var p = C.ficheConservee(contexte.produits, x.produit_id);
       if (!p) return;
-      (parProduit[p.id] = parProduit[p.id] || { produit: p, lignes: [] }).lignes.push(x);
+      var clef = p.id + '|' + x.unite_code;
+      if (!groupes[clef]) groupes[clef] = { produit: p, lignes: [] };
+      groupes[clef].lignes.push(x);
     });
 
     var out = [];
-    Object.keys(parProduit).forEach(function (id) {
-      var lot = parProduit[id];
-      var res = C.calculerAgregats(lot.lignes, contexte, reglages, lot.produit.famille_code);
-      res.lignes.forEach(function (l) {
-        var med = res.medianes[l.unite.code];
-        if (!med) return;
-        l.releves.forEach(function (x) {
-          var ecart = (Number(x.prix_unitaire_ht) - med) / med * 100;
-          if (Math.abs(ecart) > seuil) {
-            out.push({ releve: x, produit: lot.produit, mediane: med, ecart: ecart });
-          }
-        });
+    Object.keys(groupes).forEach(function (clef) {
+      var g = groupes[clef];
+      var prix = g.lignes.map(function (x) { return Number(x.prix_unitaire_ht); })
+        .sort(function (a, b) { return a - b; });
+      var milieu = Math.floor(prix.length / 2);
+      var med = prix.length % 2 ? prix[milieu] : (prix[milieu - 1] + prix[milieu]) / 2;
+      if (!med) return;
+
+      g.lignes.forEach(function (x) {
+        var ecart = (Number(x.prix_unitaire_ht) - med) / med * 100;
+        if (Math.abs(ecart) > seuil) {
+          out.push({ releve: x, produit: g.produit, mediane: med, ecart: ecart });
+        }
       });
     });
     out.sort(function (a, b) { return Math.abs(b.ecart) - Math.abs(a.ecart); });
@@ -118,8 +158,12 @@
           if (v !== null && ageEnMois(derniers[id].date) > v) aRelever++;
         });
 
-        var doublons = comptePaires(r[5], 'produit', ecartes) +
-                       comptePaires(r[6], 'fournisseur', ecartes);
+        var doublons = pairesProches(r[5]).filter(function (p) {
+                         return !ecartes['produit|' + p.a.id + '|' + p.b.id];
+                       }).length +
+                       pairesProches(r[6]).filter(function (p) {
+                         return !ecartes['fournisseur|' + p.a.id + '|' + p.b.id];
+                       }).length;
 
         var reglagesManquants = 0;
         Object.keys(contexte.familles).forEach(function (k) {
@@ -169,19 +213,6 @@
         });
       });
 
-    function comptePaires(fiches, table, ecartes) {
-      var vus = fiches.filter(function (f) { return !f.fusionne_vers; });
-      var n = 0;
-      for (var i = 0; i < vus.length; i++) {
-        for (var j = i + 1; j < vus.length; j++) {
-          if (ecartes[table + '|' + vus[i].id + '|' + vus[j].id]) continue;
-          var a = normaliser(vus[i].nom), b = normaliser(vus[j].nom);
-          if (a === b || (distance(a, b) <= 2 && Math.min(a.length, b.length) >= 4) ||
-              (a.length && b.length && (a.indexOf(b) === 0 || b.indexOf(a) === 0))) n++;
-        }
-      }
-      return n;
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -974,4 +1005,5 @@
   A.relevesSuspects = relevesSuspects;
   A.normaliserFiche = normaliser;
   A.distanceLibelle = distance;
+  A.pairesProches = pairesProches;
 })(window);

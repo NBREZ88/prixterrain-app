@@ -265,31 +265,17 @@
     }
 
     function candidats() {
-      var lot = fiches[sur].filter(function (f) { return !f.fusionne_vers; });
-      var out = [];
-      for (var i = 0; i < lot.length; i++) {
-        for (var j = i + 1; j < lot.length; j++) {
-          var a = lot[i], b = lot[j];
-          if (ecartes[sur + '|' + a.id + '|' + b.id]) continue;
-          var na = A.normaliserFiche(a.nom), nb = A.normaliserFiche(b.nom);
-          var raison = null, force = null;
-          if (na === nb) { raison = 'même nom, écrit autrement'; force = 'fort'; }
-          else if (A.distanceLibelle(na, nb) <= 2 && Math.min(na.length, nb.length) >= 4) {
-            raison = 'deux caractères de différence'; force = 'fort';
-          } else if (na.length && nb.length && (na.indexOf(nb) === 0 || nb.indexOf(na) === 0)) {
-            raison = 'l\'un commence par l\'autre'; force = 'moyen';
-          }
-          if (!raison) continue;
-          var ca = comptes(a), cb = comptes(b);
-          out.push({ a: ca.nombre >= cb.nombre ? a : b,
-                     b: ca.nombre >= cb.nombre ? b : a,
-                     ca: ca.nombre >= cb.nombre ? ca : cb,
-                     cb: ca.nombre >= cb.nombre ? cb : ca,
-                     raison: raison, force: force });
-        }
-      }
-      out.sort(function (x, y) { return x.force === 'fort' ? -1 : 1; });
-      return out;
+      return A.pairesProches(fiches[sur])
+        .filter(function (p) { return !ecartes[sur + '|' + p.a.id + '|' + p.b.id]; })
+        .map(function (p) {
+          var ca = comptes(p.a), cb = comptes(p.b);
+          var premier = ca.nombre >= cb.nombre;
+          return { a: premier ? p.a : p.b, b: premier ? p.b : p.a,
+                   ca: premier ? ca : cb, cb: premier ? cb : ca,
+                   raison: p.raison, force: p.force };
+        })
+        .sort(function (x, y) { return x.force === 'fort' ? -1 : 1; })
+        .slice(0, 100);
     }
 
     function dessiner() {

@@ -1173,20 +1173,39 @@ if ('serviceWorker' in navigator) {
 
   // Une zone intérieure prend la hauteur restante ; la page cesse alors de défiler.
   var aAjuster = [];
+  var observateur = null;
+
   function ajusterHauteurs() {
     var barreEl = document.getElementById('barre');
-    var barreBasse = getComputedStyle(barreEl).position === 'fixed' &&
-                     getComputedStyle(barreEl).bottom === '0px' ? barreEl.offsetHeight : 0;
+    var style = getComputedStyle(barreEl);
+    var barreBasse = (style.position === 'fixed' && style.bottom === '0px')
+      ? barreEl.offsetHeight : 0;
     var limite = window.innerHeight - barreBasse;
+
     aAjuster.forEach(function (zoneEl) {
       if (!zoneEl.isConnected || !zoneEl.offsetParent) { zoneEl.style.maxHeight = ''; return; }
       var haut = zoneEl.getBoundingClientRect().top;
-      zoneEl.style.maxHeight = Math.max(140, limite - haut - 8) + 'px';
+      var place = limite - haut - 8;
+      // En dessous de 240 pixels une zone n'est plus lisible : on rend la main
+      // au défilement de la page plutôt que d'écraser le contenu.
+      if (place < 240) { zoneEl.style.maxHeight = ''; verrouiller(false); return; }
+      zoneEl.style.maxHeight = place + 'px';
     });
   }
+
   function suivreHauteur(zoneEl) {
     zoneEl.classList.add('zone-defilante');
     aAjuster.push(zoneEl);
+    // Les écrans remplissent leur zone après avoir lu la base : on refait la
+    // mesure à chaque changement, sans que chacun ait à y penser.
+    if (observateur) observateur.observe(zoneEl, { childList: true, subtree: true });
+  }
+
+  if (window.MutationObserver) {
+    observateur = new MutationObserver(function () {
+      clearTimeout(observateur.minuterie);
+      observateur.minuterie = setTimeout(ajusterHauteurs, 60);
+    });
   }
   function verrouiller(actif) {
     document.documentElement.style.overflow = actif ? 'hidden' : '';

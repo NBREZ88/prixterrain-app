@@ -376,19 +376,43 @@
       A.base.functions.invoke('inviter-conseiller', {
         body: { nom: nom, courriel: courriel, role: role }
       }).then(function (reponse) {
-        // La fonction répond par un message clair : on le préfère au message
-        // technique de la couche réseau.
-        var refus = reponse.data && reponse.data.erreur;
-        if (refus) { if (apres) apres(refus); return; }
-        if (reponse.error) { if (apres) apres(A.messageSimple(reponse.error)); return; }
+        if (reponse.data && reponse.data.erreur) {
+          if (apres) apres(reponse.data.erreur);
+          return;
+        }
+        if (reponse.error) return direErreurFonction(reponse.error, apres);
 
         return charger().then(function () {
           poser();
           if (apres) apres(null);
         });
       }).catch(function (e) {
-        if (apres) apres(A.messageSimple(e));
+        return direErreurFonction(e, apres);
       });
+    }
+
+    // La fonction hébergée renvoie son motif dans le corps de la réponse, pas
+    // dans l'objet d'erreur : sans le lire, on n'afficherait qu'« erreur ».
+    function direErreurFonction(erreur, apres) {
+      var reponse = erreur && erreur.context;
+
+      if (reponse && typeof reponse.json === 'function') {
+        return reponse.json().then(function (corps) {
+          if (apres) apres(corps && corps.erreur ? corps.erreur : motif(reponse.status));
+        }).catch(function () {
+          if (apres) apres(motif(reponse.status));
+        });
+      }
+      if (apres) apres(erreur && erreur.message ? erreur.message : 'Envoi impossible.');
+    }
+
+    function motif(code) {
+      if (code === 401) return 'Session expirée. Reconnectez-vous.';
+      if (code === 403) return 'Seul un responsable peut inviter un conseiller.';
+      if (code === 404) {
+        return 'La fonction « inviter-conseiller » est introuvable sur le serveur.';
+      }
+      return 'Le serveur a refusé l\'invitation (code ' + code + ').';
     }
 
     function modifier(membre, changements) {

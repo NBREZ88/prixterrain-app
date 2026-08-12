@@ -41,6 +41,7 @@
     var responsable = compte && compte.role === 'administrateur';
     var vue = 'moi';
     var equipe = [];
+    var invitations = [];
 
     zone.innerHTML = '';
     zone.className = 'ecran-compte';
@@ -62,11 +63,25 @@
     var corps = element('div');
     zone.appendChild(corps);
 
-    A.bd.profil.toArray().then(function (r) {
-      equipe = r.sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+    charger().then(function () {
       poserOnglets();
       poser();
     });
+
+    function charger() {
+      // Les invitations vivent en base, pas dans la copie locale : elles
+      // doivent être vues par les deux responsables en même temps.
+      var enAttente = global.navigator.onLine
+        ? A.base.from('invitation').select('*').then(function (r) { return r.data || []; })
+        : Promise.resolve([]);
+
+      return Promise.all([A.bd.profil.toArray(), enAttente]).then(function (r) {
+        equipe = r[0].sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+        invitations = (r[1] || []).sort(function (a, b) {
+          return a.nom.localeCompare(b.nom, 'fr');
+        });
+      });
+    }
 
     function initiales(texte) {
       return String(texte || '?').split(/\s+/).slice(0, 2)
@@ -184,6 +199,9 @@
 
     // ---- l'équipe ----
     function poserEquipe() {
+      if (responsable) {
+        corps.appendChild(bouton('action-compte', '+ Inviter un conseiller', ouvrirInvitation));
+      }
       if (!equipe.length) {
         corps.appendChild(element('p', 'vide', 'Aucun conseiller enregistré.'));
         return;
@@ -230,13 +248,147 @@
         }
         e.appendChild(l);
       });
+
+      // Invitations envoyées, pas encore acceptées.
+      invitations.forEach(function (inv) {
+        var l = element('div', 'membre invite');
+        l.appendChild(element('span', 'm-jeton', initiales(inv.nom)));
+
+        var textes = element('span', 'm-textes');
+        var nomInvite = element('span', 'm-nom');
+        nomInvite.appendChild(element('span', null, inv.nom));
+        nomInvite.appendChild(element('span', 'etat-membre invite', 'invité'));
+        textes.appendChild(nomInvite);
+        textes.appendChild(element('span', 'm-appui',
+          (inv.role === 'administrateur' ? 'Responsable' : 'Conseiller') + ' · ' + inv.courriel));
+        l.appendChild(textes);
+
+        if (responsable) {
+          var actions = element('span', 'm-actions');
+          actions.appendChild(bouton('mini-bouton clair', 'Renvoyer l\'invitation', function () {
+            envoyerInvitation(inv.nom, inv.courriel, inv.role, null);
+          }));
+          actions.appendChild(bouton('mini-bouton clair rouge', 'Annuler', function () {
+            A.base.from('invitation').delete().eq('courriel', inv.courriel)
+              .then(function () { return charger(); })
+              .then(poser);
+          }));
+          l.appendChild(actions);
+        }
+        e.appendChild(l);
+      });
+
       corps.appendChild(e);
 
       if (responsable) {
         corps.appendChild(element('p', 'appui',
           'Un compte suspendu ne peut plus se connecter. Ses relevés restent en place. ' +
-          'La création d\'un compte se fait depuis le tableau de bord de la base.'));
+          'Un conseiller invité reçoit un courriel avec un lien pour choisir son mot de passe.'));
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Inviter un conseiller
+    //
+    // L'invitation passe par une fonction hébergée : elle exige la clé
+    // d'administration de la base, qui ne peut pas vivre dans une page web.
+    // -----------------------------------------------------------------------
+    function ouvrirInvitation() {
+      var voile = element('div', 'voile');
+      var boite = element('div', 'boite');
+
+      var tete = element('div', 'boite-tete');
+      var t = element('div');
+      t.appendChild(element('p', 'boite-titre', 'Inviter un conseiller'));
+      t.appendChild(element('p', 'boite-sous',
+        'Il recevra un courriel pour choisir son mot de passe'));
+      tete.appendChild(t);
+      tete.appendChild(bouton('boite-fermer', '✕', function () { voile.remove(); }));
+      boite.appendChild(tete);
+
+      var dedans = element('div', 'boite-corps');
+      var champs = {};
+      [['nom', 'Nom et prénom', 'text', 'Marie Dupont'],
+       ['courriel', 'Courriel professionnel', 'email', 'prenom.nom@meuse.chambagri.fr']
+      ].forEach(function (c) {
+        var champ = element('div', 'champ-fenetre');
+        champ.appendChild(element('span', 'lab', c[1]));
+        var i = element('input', 'ch');
+        i.type = c[2];
+        i.placeholder = c[3];
+        champ.appendChild(i);
+        dedans.appendChild(champ);
+        champs[c[0]] = i;
+      });
+
+      var champRole = element('div', 'champ-fenetre');
+      champRole.appendChild(element('span', 'lab', 'Rôle'));
+      var choixRole = element('select', 'ch');
+      choixRole.appendChild(new Option('Conseiller', 'conseiller'));
+      choixRole.appendChild(new Option('Responsable', 'administrateur'));
+      champRole.appendChild(choixRole);
+      dedans.appendChild(champRole);
+
+      dedans.appendChild(element('p', 'note',
+        'Un conseiller saisit des prix et consulte tout. Un responsable peut en plus ' +
+        'modifier les réglages, réunir les fiches et gérer l\'équipe.'));
+
+      var message = element('p', 'alerte');
+      message.style.display = 'none';
+      dedans.appendChild(message);
+      boite.appendChild(dedans);
+
+      var pied = element('div', 'boite-pied');
+      var envoyer = bouton('principal pleine', 'Envoyer l\'invitation', function () {
+        var nom = champs.nom.value.trim();
+        var courriel = champs.courriel.value.trim();
+
+        if (nom.length < 2) return dire('Indiquez le nom et le prénom du conseiller.');
+        if (courriel.indexOf('@') < 1) return dire('Le courriel ne semble pas valide.');
+        if (!global.navigator.onLine) {
+          return dire('Sans réseau, l\'invitation ne peut pas être envoyée.');
+        }
+
+        envoyer.disabled = true;
+        dire('Envoi en cours…');
+        envoyerInvitation(nom, courriel, choixRole.value, function (erreur) {
+          envoyer.disabled = false;
+          if (erreur) return dire(erreur);
+          voile.remove();
+        });
+      });
+      pied.appendChild(envoyer);
+      pied.appendChild(bouton('bouton-neutre', 'Revenir', function () { voile.remove(); }));
+      boite.appendChild(pied);
+
+      function dire(texte) {
+        message.textContent = texte;
+        message.style.display = 'block';
+      }
+
+      voile.appendChild(boite);
+      voile.addEventListener('click', function (e) { if (e.target === voile) voile.remove(); });
+      document.body.appendChild(voile);
+      champs.nom.focus();
+    }
+
+    function envoyerInvitation(nom, courriel, role, apres) {
+      A.base.functions.invoke('inviter-conseiller', {
+        body: { nom: nom, courriel: courriel, role: role }
+      }).then(function (reponse) {
+        // La fonction répond par un message clair : on le préfère au message
+        // technique de la couche réseau.
+        var refus = reponse.data && reponse.data.erreur;
+        if (refus) { if (apres) apres(refus); return; }
+        if (reponse.error) { if (apres) apres(A.messageSimple(reponse.error)); return; }
+
+        return charger().then(function () {
+          poser();
+          if (apres) apres(null);
+        });
+      }).catch(function (e) {
+        if (apres) apres(A.messageSimple(e));
+      });
     }
 
     function modifier(membre, changements) {
